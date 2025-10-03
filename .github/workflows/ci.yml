@@ -2,9 +2,14 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ "*" ]
+    branches:
+      - main
+      - develop
+      - "feature/**"
+      - "fix/**"
+      - "hotfix/**"
   pull_request:
-    branches: [ "*" ]
+    branches: ["main", "develop"]
 
 jobs:
   commitlint:
@@ -19,7 +24,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: "18"
 
       - name: Install commitlint
         run: |
@@ -43,7 +48,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24.5'
+          go-version: "1.24.5"
 
       - name: Download dependencies
         run: |
@@ -144,7 +149,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24.5'
+          go-version: "1.24.5"
 
       - name: Download dependencies
         run: |
@@ -211,7 +216,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24.5'
+          go-version: "1.24.5"
 
       - name: Download dependencies
         run: |
@@ -256,7 +261,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24.5'
+          go-version: "1.24.5"
 
       - name: Install Gosec
         run: curl -sfL https://raw.githubusercontent.com/securego/gosec/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
