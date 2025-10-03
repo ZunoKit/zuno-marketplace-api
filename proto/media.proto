@@ -1,0 +1,60 @@
+syntax = "proto3";
+package media;
+option go_package = "shared/proto/media;media";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+
+enum MediaKind { MEDIA_KIND_UNSPECIFIED = 0; IMAGE = 1; VIDEO = 2; AUDIO = 3; OTHER = 9; }
+enum VariantFormat { VARIANT_FORMAT_UNSPECIFIED = 0; JPG = 1; WEBP = 2; PNG = 3; MP4 = 10; GIF = 11; }
+enum PinStatus { PIN_STATUS_UNSPECIFIED = 0; PENDING = 1; PINNING = 2; PINNED = 3; FAILED = 4; }
+
+message MediaVariant {
+  string id = 1;
+  string cdn_url = 2;
+  uint32 width = 3;
+  uint32 height = 4;
+  VariantFormat format = 5;
+}
+
+message Asset {
+  string id = 1;
+  MediaKind kind = 2;
+  string mime = 3;
+  uint64 bytes = 4;
+  google.protobuf.UInt32Value width = 5;
+  google.protobuf.UInt32Value height = 6;
+  string s3_key = 7;
+  google.protobuf.StringValue ipfs_cid = 8;     // set nếu đã PINNED
+  PinStatus pin_status = 9;                     // PENDING|PINNING|PINNED|FAILED
+  string sha256 = 10;
+  google.protobuf.Timestamp created_at = 11;
+  uint32 ref_count = 12;
+  repeated MediaVariant variants = 13;
+  google.protobuf.StringValue gateway_url = 14; // https://gateway.pinata.cloud/ipfs/<cid>
+}
+
+message SingleUploadRequest {
+  bytes file_data = 1;
+  string filename = 2;
+  string mime = 3;
+  MediaKind kind = 4;
+  google.protobuf.UInt32Value width = 5;   // optional
+  google.protobuf.UInt32Value height = 6;  // optional
+  string owner_id = 7;                     // optional (audit/link)
+}
+
+message UploadAndPinResponse {
+  Asset asset = 1;     // asset.ipfs_cid MUST be set, pin_status=PINNED
+  bool deduplicated = 2;
+}
+
+message GetAssetRequest { string id = 1; }
+message GetAssetByCidRequest { string cid = 1; }
+message GetAssetResponse { Asset asset = 1; }
+
+service MediaService {
+  rpc UploadSingleFile      (SingleUploadRequest)            returns (UploadAndPinResponse);
+  rpc GetAsset              (GetAssetRequest)                returns (GetAssetResponse);
+  rpc GetAssetByCid         (GetAssetByCidRequest)           returns (GetAssetResponse);
+}

@@ -1,0 +1,25 @@
+# Ignore VCS
+.git
+.gitignore
+
+# Build artifacts
+build/
+**/bin/
+**/dist/
+
+# Kubernetes/Tilt and infra not needed for build
+Tiltfile
+infra/development/k8s/
+copilot/
+
+# Tests and docs (not needed for building binaries)
+**/test/
+**/*_test.go
+**/*.md
+
+# Node and editor junk
+node_modules/
+*.log
+.DS_Store
+.vscode/
+.idea/

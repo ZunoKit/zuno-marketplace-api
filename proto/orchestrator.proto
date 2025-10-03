@@ -1,0 +1,42 @@
+syntax = "proto3";
+package orchestrator;
+option go_package = "shared/proto/orchestrator;orchestrator";
+
+message TxRequest { string to = 1; bytes data = 2; string value = 3; string preview_address = 4; }
+message PrepareCreateCollectionRequest {
+  string chain_id = 1; string name = 2; string symbol = 3;
+  string creator = 4; string token_uri = 5; // replace logo_cid/banner_cid with token_uri
+  string description = 6;
+  uint64 mint_price = 7;
+  uint64 royalty_fee = 8;
+  uint64 max_supply = 9;
+  uint64 mint_limit_per_wallet = 10;
+  uint64 mint_start_time = 11;
+  uint64 allowlist_mint_price = 12;
+  uint64 public_mint_price = 13;
+  uint64 allowlist_stage_duration = 14;
+  string type = 15; // ERC721 or ERC1155 - specifies the collection type
+}
+message PrepareCreateCollectionResponse { string intent_id = 1; TxRequest tx = 2; }
+
+message PrepareMintRequest {
+  string chain_id = 1; string contract = 2; string minter = 3;
+  string standard = 4; uint64 quantity = 5; // ERC721: 1
+}
+message PrepareMintResponse { string intent_id = 1; TxRequest tx = 2; }
+
+message TrackTxRequest { string intent_id = 1; string chain_id = 2; string tx_hash = 3; string contract = 4; }
+message TrackTxResponse { bool ok = 1; }
+
+message GetIntentStatusRequest { string intent_id = 1; }
+message GetIntentStatusResponse {
+  string intent_id = 1; string kind = 2; string status = 3; // pending|ready|failed|expired
+  string chain_id = 4; string tx_hash = 5; string contract_address = 6;
+}
+
+service OrchestratorService {
+  rpc PrepareCreateCollection(PrepareCreateCollectionRequest) returns (PrepareCreateCollectionResponse);
+  rpc PrepareMint(PrepareMintRequest) returns (PrepareMintResponse);
+  rpc TrackTx(TrackTxRequest) returns (TrackTxResponse);           // dùng chung cho cả 2
+  rpc GetIntentStatus(GetIntentStatusRequest) returns (GetIntentStatusResponse);
+}

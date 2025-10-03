@@ -1,0 +1,52 @@
+syntax = "proto3";
+package auth;
+option go_package = "shared/proto/auth;auth";
+
+
+message GetNonceRequest { string account_id = 1; string chain_id = 2; string domain = 3; }
+message GetNonceResponse { string nonce = 1; }
+
+message VerifySiweRequest { string account_id = 1; string message = 2; string signature = 3; }
+message VerifySiweResponse {
+  string access_token  = 1;
+  string refresh_token = 2;
+  string expires_at    = 3;
+  string user_id       = 4;
+  string address       = 5;
+  string chain_id      = 6;
+}
+
+message RefreshSessionRequest { 
+  string refresh_token = 1; 
+  string user_agent = 2;
+  string ip_address = 3;
+}
+message RefreshSessionResponse {
+  string access_token  = 1;
+  string refresh_token = 2;
+  string expires_at    = 3;
+  string user_id       = 4;
+}
+
+message RevokeSessionRequest { 
+  string session_id = 1; 
+}
+message RevokeSessionResponse {
+  bool success = 1;
+}
+
+message RevokeSessionByRefreshTokenRequest { 
+  string refresh_token = 1; 
+}
+message RevokeSessionByRefreshTokenResponse {
+  bool success = 1;
+}
+
+service AuthService {
+  rpc GetNonce(GetNonceRequest) returns (GetNonceResponse);
+  rpc VerifySiwe(VerifySiweRequest) returns (VerifySiweResponse);
+  rpc RefreshSession(RefreshSessionRequest) returns (RefreshSessionResponse);
+  rpc RevokeSession(RevokeSessionRequest) returns (RevokeSessionResponse);
+  rpc RevokeSessionByRefreshToken(RevokeSessionByRefreshTokenRequest) returns (RevokeSessionByRefreshTokenResponse);
+}
+
