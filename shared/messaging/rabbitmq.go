@@ -68,11 +68,22 @@ type MessageHandler func(context.Context, amqp.Delivery) error
 
 // Message represents a message to be published
 type Message struct {
+	Exchange   string
 	RoutingKey string
 	Body       []byte
 	Headers    map[string]interface{}
 	Timestamp  time.Time
 	MessageID  string
+}
+
+// ToAMQPMessage converts Message to contracts.AMQPMessage
+func (m *Message) ToAMQPMessage() contracts.AMQPMessage {
+	return contracts.AMQPMessage{
+		Exchange:   m.Exchange,
+		RoutingKey: m.RoutingKey,
+		Body:       m.Body,
+		Headers:    m.Headers,
+	}
 }
 
 // RabbitMQ wraps the AMQP connection and provides high-level operations
