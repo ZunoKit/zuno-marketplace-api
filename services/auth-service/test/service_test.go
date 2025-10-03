@@ -83,7 +83,7 @@ func (suite *AuthServiceTestSuite) SetupTest() {
 		nil,
 		[]byte("test-jwt-secret"),
 		[]byte("test-refresh-jwt-secret"),
-		false,
+		false, // enableCollectionContext
 	)
 }
 

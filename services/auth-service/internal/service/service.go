@@ -35,7 +35,7 @@ type Service struct {
 	refreshSecret []byte
 	nonceTTL      time.Duration
 	sessionTTL    time.Duration
-	enhancedAuthSessions bool
+	enableCollectionContext bool
 }
 
 func NewAuthService(
@@ -44,7 +44,7 @@ func NewAuthService(
 	walletService protoWallet.WalletServiceClient,
 	publisher domain.AuthEventPublisher,
 	jwtSecret, refreshSecret []byte,
-	enhancedAuthSessions bool,
+	enableCollectionContext bool,
 ) domain.AuthService {
 	return &Service{
 		authRepo:      authRepo,
@@ -55,7 +55,7 @@ func NewAuthService(
 		refreshSecret: refreshSecret,
 		nonceTTL:      5 * time.Minute,
 		sessionTTL:    24 * time.Hour,
-		enhancedAuthSessions: enhancedAuthSessions,
+		enableCollectionContext: enableCollectionContext,
 	}
 }
 
@@ -166,7 +166,7 @@ func (s *Service) VerifySiwe(ctx context.Context, accountID, message, signature 
 	}
 
 	// Optionally attach collection intent context when feature enabled and header present
-	if s.enhancedAuthSessions {
+	if s.enableCollectionContext {
 		if md, ok := metadata.FromIncomingContext(ctx); ok {
 			values := md.Get("x-prepare-collection")
 			flag := len(values) > 0 && strings.EqualFold(values[0], "true")

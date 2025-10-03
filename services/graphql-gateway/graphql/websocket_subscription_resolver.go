@@ -12,8 +12,8 @@ import (
 	orchestratorpb "github.com/quangdang46/NFT-Marketplace/shared/proto/orchestrator"
 )
 
-// EnhancedSubscriptionResolver implements real-time WebSocket-based subscriptions
-type EnhancedSubscriptionResolver struct {
+// WebSocketSubscriptionResolver implements real-time WebSocket-based subscriptions
+type WebSocketSubscriptionResolver struct {
 	server              *Resolver
 	activeSubscriptions map[string]*intentSubscription
 	mu                  sync.RWMutex
@@ -29,16 +29,16 @@ type intentSubscription struct {
 	lastStatus *schemas.IntentStatusPayload
 }
 
-// NewEnhancedSubscriptionResolver creates a new enhanced subscription resolver
-func NewEnhancedSubscriptionResolver(server *Resolver) *EnhancedSubscriptionResolver {
-	return &EnhancedSubscriptionResolver{
+// NewWebSocketSubscriptionResolver creates a new WebSocket-based subscription resolver
+func NewWebSocketSubscriptionResolver(server *Resolver) *WebSocketSubscriptionResolver {
+	return &WebSocketSubscriptionResolver{
 		server:              server,
 		activeSubscriptions: make(map[string]*intentSubscription),
 	}
 }
 
 // OnIntentStatus subscribes to real-time intent status updates via WebSocket
-func (r *EnhancedSubscriptionResolver) OnIntentStatus(ctx context.Context, intentID string) (<-chan *schemas.IntentStatusPayload, error) {
+func (r *WebSocketSubscriptionResolver) OnIntentStatus(ctx context.Context, intentID string) (<-chan *schemas.IntentStatusPayload, error) {
 	// Validate input
 	if intentID == "" {
 		return nil, fmt.Errorf("invalid intent ID")
@@ -181,7 +181,7 @@ func (r *EnhancedSubscriptionResolver) OnIntentStatus(ctx context.Context, inten
 }
 
 // fetchCurrentStatus fetches the current status from the orchestrator service
-func (r *EnhancedSubscriptionResolver) fetchCurrentStatus(ctx context.Context, intentID string) (*schemas.IntentStatusPayload, error) {
+func (r *WebSocketSubscriptionResolver) fetchCurrentStatus(ctx context.Context, intentID string) (*schemas.IntentStatusPayload, error) {
 	resp, err := (*r.server.orchestratorClient.Client).GetIntentStatus(ctx, &orchestratorpb.GetIntentStatusRequest{
 		IntentId: intentID,
 	})
@@ -209,7 +209,7 @@ func (r *EnhancedSubscriptionResolver) fetchCurrentStatus(ctx context.Context, i
 }
 
 // payloadsEqual compares two status payloads to check for changes
-func (r *EnhancedSubscriptionResolver) payloadsEqual(a, b *schemas.IntentStatusPayload) bool {
+func (r *WebSocketSubscriptionResolver) payloadsEqual(a, b *schemas.IntentStatusPayload) bool {
 	if a.IntentID != b.IntentID || a.Status != b.Status || a.Kind != b.Kind {
 		return false
 	}
@@ -228,7 +228,7 @@ func (r *EnhancedSubscriptionResolver) payloadsEqual(a, b *schemas.IntentStatusP
 }
 
 // cleanupSubscription removes a subscription from tracking
-func (r *EnhancedSubscriptionResolver) cleanupSubscription(intentID string) {
+func (r *WebSocketSubscriptionResolver) cleanupSubscription(intentID string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -240,14 +240,14 @@ func (r *EnhancedSubscriptionResolver) cleanupSubscription(intentID string) {
 }
 
 // GetActiveSubscriptions returns the number of active subscriptions (for monitoring)
-func (r *EnhancedSubscriptionResolver) GetActiveSubscriptions() int {
+func (r *WebSocketSubscriptionResolver) GetActiveSubscriptions() int {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return len(r.activeSubscriptions)
 }
 
 // Shutdown gracefully shuts down all active subscriptions
-func (r *EnhancedSubscriptionResolver) Shutdown() {
+func (r *WebSocketSubscriptionResolver) Shutdown() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
