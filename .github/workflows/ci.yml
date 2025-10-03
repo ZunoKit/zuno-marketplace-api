@@ -240,7 +240,7 @@ jobs:
           fi
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.service }}-binary
           path: services/${{ matrix.service }}/bin/${{ matrix.service }}
