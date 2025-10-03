@@ -85,6 +85,7 @@ func (p *EventPublisher) PublishDomainEvent(ctx context.Context, event *domain.D
 
 	// Publish message
 	message := &messaging.Message{
+		Exchange:   "collections.events",
 		RoutingKey: routingKey,
 		Body:       eventData,
 		Headers:    headers,
@@ -92,7 +93,7 @@ func (p *EventPublisher) PublishDomainEvent(ctx context.Context, event *domain.D
 		MessageID:  event.EventID,
 	}
 
-	err = p.amqp.Publish(ctx, message)
+	err = p.amqp.Publish(ctx, message.ToAMQPMessage())
 	if err != nil {
 		return fmt.Errorf("failed to publish domain event: %w", err)
 	}
@@ -286,7 +287,7 @@ func (p *EventPublisher) PublishHealthCheck(ctx context.Context, serviceID strin
 		MessageID: healthEvent.EventID,
 	}
 
-	return p.amqp.Publish(ctx, message)
+	return p.amqp.Publish(ctx, message.ToAMQPMessage())
 }
 
 // generateDomainEventID creates a unique event ID for domain events

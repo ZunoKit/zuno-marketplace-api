@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"sync"
-	"time"
 
 	"github.com/quangdang46/NFT-Marketplace/services/graphql-gateway/graphql/schemas"
 	"github.com/quangdang46/NFT-Marketplace/services/graphql-gateway/utils"

@@ -132,7 +132,7 @@ type OrchestratorRepo interface {
 	GetByID(ctx context.Context, intentID string) (*Intent, error)
 
 	FindByChainTx(ctx context.Context, chainID ChainID, txHash string) (*Intent, error)
-\tInsertSessionIntentAudit(ctx context.Context, sessionID string, intentID string, userID *string, auditData any) error
+	InsertSessionIntentAudit(ctx context.Context, sessionID string, intentID string, userID *string, auditData any) error
 }
 
 type StatusCache interface {

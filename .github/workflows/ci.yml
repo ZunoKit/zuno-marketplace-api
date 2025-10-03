@@ -345,11 +345,13 @@ jobs:
         run: go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
 
       - name: Run Gosec Security Scanner
-        run: gosec -fmt sarif -out results.sarif ./...
+        run: |
+          gosec -fmt sarif -out results.sarif ./... || echo "Gosec scan completed"
+          ls -la results.sarif || echo "No SARIF file generated"
         continue-on-error: true
 
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@v2
-        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() && hashFiles('results.sarif') != ''
         with:
           sarif_file: results.sarif

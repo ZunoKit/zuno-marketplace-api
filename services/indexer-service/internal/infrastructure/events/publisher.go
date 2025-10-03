@@ -67,6 +67,7 @@ func (p *EventPublisher) PublishCollectionEvent(ctx context.Context, chainID str
 
 	// Publish message
 	message := &messaging.Message{
+		Exchange:   "collections.events",
 		RoutingKey: routingKey,
 		Body:       eventData,
 		Headers:    headers,
@@ -74,7 +75,7 @@ func (p *EventPublisher) PublishCollectionEvent(ctx context.Context, chainID str
 		MessageID:  event.EventID,
 	}
 
-	err = p.amqp.Publish(ctx, message)
+	err = p.amqp.Publish(ctx, message.ToAMQPMessage())
 	if err != nil {
 		return fmt.Errorf("failed to publish collection event: %w", err)
 	}
@@ -150,6 +151,7 @@ func (p *EventPublisher) PublishMintEvent(ctx context.Context, chainID string, e
 
 	// Publish message
 	message := &messaging.Message{
+		Exchange:   "collections.events",
 		RoutingKey: routingKey,
 		Body:       eventData,
 		Headers:    headers,
@@ -157,7 +159,7 @@ func (p *EventPublisher) PublishMintEvent(ctx context.Context, chainID string, e
 		MessageID:  event.EventID,
 	}
 
-	err = p.amqp.Publish(ctx, message)
+	err = p.amqp.Publish(ctx, message.ToAMQPMessage())
 	if err != nil {
 		return fmt.Errorf("failed to publish mint event: %w", err)
 	}
@@ -220,7 +222,7 @@ func (p *EventPublisher) PublishHealthCheck(ctx context.Context, chainID string)
 		MessageID: healthEvent.EventID,
 	}
 
-	return p.amqp.Publish(ctx, message)
+	return p.amqp.Publish(ctx, message.ToAMQPMessage())
 }
 
 // generateEventID creates a unique event ID
