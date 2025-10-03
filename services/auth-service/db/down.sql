@@ -6,7 +6,7 @@ DROP FUNCTION IF EXISTS cleanup_expired_sessions();
 DROP FUNCTION IF EXISTS cleanup_old_login_events(integer);
 DROP FUNCTION IF EXISTS cleanup_expired_nonces();
 
--- Xoá index/column được thêm bởi enhanced session context
+-- Remove index/column added for collection context support
 DROP INDEX IF EXISTS idx_sessions_collection_context;
 ALTER TABLE IF EXISTS sessions DROP COLUMN IF EXISTS collection_intent_context;
 
