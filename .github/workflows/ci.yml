@@ -75,7 +75,7 @@ jobs:
 
       - name: Check formatting
         run: |
-          unformatted=$(gofmt -s -l . | grep -v vendor | grep -v .pb.go || true)
+          unformatted=$(find . -name "*.go" -not -path "./vendor/*" -not -name "*.pb.go" -exec gofmt -s -l {} + 2>/dev/null || true)
           if [ -n "$unformatted" ]; then
             echo "❌ The following files are not formatted:"
             echo "$unformatted"
@@ -85,7 +85,7 @@ jobs:
 
       - name: Check imports
         run: |
-          import_issues=$(goimports -l . | grep -v vendor | grep -v .pb.go || true)
+          import_issues=$(find . -name "*.go" -not -path "./vendor/*" -not -name "*.pb.go" -exec goimports -l {} + 2>/dev/null || true)
           if [ -n "$import_issues" ]; then
             echo "❌ The following files have import issues:"
             echo "$import_issues"
@@ -94,7 +94,12 @@ jobs:
           fi
 
       - name: Run golangci-lint
-        run: $(go env GOPATH)/bin/golangci-lint run --timeout=5m
+        run: |
+          if command -v $(go env GOPATH)/bin/golangci-lint >/dev/null 2>&1; then
+            $(go env GOPATH)/bin/golangci-lint run --timeout=5m
+          else
+            echo "golangci-lint not found, skipping"
+          fi
         continue-on-error: true
 
   test:

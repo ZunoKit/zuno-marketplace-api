@@ -123,7 +123,7 @@ func (m *MockEncoder) EncodeMint(ctx context.Context, chainID domain.ChainID, co
 // Helper function to create service with mocked dependencies
 func createTestService(mockRepo *MockRepo, mockStatusCache *MockStatusCache, mockChainRegistry *MockChainRegistryClient) domain.OrchestratorService {
 	encoder := &MockEncoder{}
-	return service.NewOrchestrator(mockRepo, encoder, mockStatusCache, mockChainRegistry)
+	return service.NewOrchestrator(mockRepo, encoder, mockStatusCache, mockChainRegistry, false)
 }
 
 func TestPrepareCreateCollection(t *testing.T) {

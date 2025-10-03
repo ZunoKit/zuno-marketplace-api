@@ -55,7 +55,7 @@ func ValidateCreateCollectionInput(in domain.PrepareCreateCollectionInput) error
 	if in.MintPrice != nil && *in.MintPrice > 0 {
 	}
 	if in.RoyaltyFee != nil && *in.RoyaltyFee > 10000 {
-		return fmt.Errorf("royalty fee cannot exceed 100%")
+		return fmt.Errorf("royalty fee cannot exceed 100%%")
 	}
 	if in.MaxSupply != nil && *in.MaxSupply == 0 {
 		return fmt.Errorf("max supply must be greater than 0")
