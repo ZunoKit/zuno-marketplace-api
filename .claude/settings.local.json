@@ -9,7 +9,9 @@
       "Bash(go:*)",
       "WebSearch",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(goimports:*)"
     ],
     "deny": [],
     "ask": []

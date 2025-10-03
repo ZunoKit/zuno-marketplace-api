@@ -259,12 +259,6 @@ jobs:
 
       - name: Run Gosec Security Scanner
         run: |
-          gosec -fmt sarif -out results.sarif ./... || echo "Gosec scan completed"
-          ls -la results.sarif || echo "No SARIF file generated"
+          gosec -fmt json -out results.json ./... || echo "Gosec scan completed"
+          gosec -fmt text ./... || echo "Gosec scan completed"
         continue-on-error: true
-
-      - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@v3
-        if: always() && hashFiles('results.sarif') != ''
-        with:
-          sarif_file: results.sarif
