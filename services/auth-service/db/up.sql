@@ -77,7 +77,7 @@ ALTER TABLE sessions
   DROP CONSTRAINT IF EXISTS chk_session_revoked,
   ADD  CONSTRAINT chk_session_revoked CHECK (revoked_at IS NULL OR revoked_at >= created_at);
 
--- ======================= ENHANCED SESSION CONTEXT =======================
+-- ======================= COLLECTION CONTEXT SUPPORT =======================
 ALTER TABLE sessions
   ADD COLUMN IF NOT EXISTS collection_intent_context JSONB DEFAULT NULL;
 
