@@ -13,9 +13,9 @@ type Config struct {
 	MongoConfig        mongo.MongoConfig
 	PostgresConfig     postgres.PostgresConfig
 	RabbitMQ           messaging.RabbitMQConfig
-	ChainRPCs          map[string]string    // chainId -> RPC URL
-	FactoryContracts   map[string]string    // chainId -> factory contract address
-	ConfirmationBlocks map[string]int       // chainId -> number of confirmation blocks
+	ChainRPCs          map[string]string // chainId -> RPC URL
+	FactoryContracts   map[string]string // chainId -> factory contract address
+	ConfirmationBlocks map[string]int    // chainId -> number of confirmation blocks
 	PollingInterval    time.Duration
 }
 
@@ -41,22 +41,22 @@ func NewConfig() *Config {
 			RabbitMQExchange: env.GetString("RABBITMQ_EXCHANGE", "nft-marketplace"),
 		},
 		ChainRPCs: map[string]string{
-			"eip155-1":     env.GetString("ETH_MAINNET_RPC", ""),     // Ethereum Mainnet
-			"eip155-11155111": env.GetString("ETH_SEPOLIA_RPC", ""),  // Ethereum Sepolia
-			"eip155-137":   env.GetString("POLYGON_RPC", ""),         // Polygon
-			"eip155-80001": env.GetString("MUMBAI_RPC", ""),          // Polygon Mumbai
+			"eip155-1":        env.GetString("ETH_MAINNET_RPC", ""), // Ethereum Mainnet
+			"eip155-11155111": env.GetString("ETH_SEPOLIA_RPC", ""), // Ethereum Sepolia
+			"eip155-137":      env.GetString("POLYGON_RPC", ""),     // Polygon
+			"eip155-80001":    env.GetString("MUMBAI_RPC", ""),      // Polygon Mumbai
 		},
 		FactoryContracts: map[string]string{
-			"eip155-1":     env.GetString("ETH_MAINNET_FACTORY", ""),
+			"eip155-1":        env.GetString("ETH_MAINNET_FACTORY", ""),
 			"eip155-11155111": env.GetString("ETH_SEPOLIA_FACTORY", ""),
-			"eip155-137":   env.GetString("POLYGON_FACTORY", ""),
-			"eip155-80001": env.GetString("MUMBAI_FACTORY", ""),
+			"eip155-137":      env.GetString("POLYGON_FACTORY", ""),
+			"eip155-80001":    env.GetString("MUMBAI_FACTORY", ""),
 		},
 		ConfirmationBlocks: map[string]int{
-			"eip155-1":     env.GetInt("ETH_MAINNET_CONFIRMATIONS", 12),
+			"eip155-1":        env.GetInt("ETH_MAINNET_CONFIRMATIONS", 12),
 			"eip155-11155111": env.GetInt("ETH_SEPOLIA_CONFIRMATIONS", 3),
-			"eip155-137":   env.GetInt("POLYGON_CONFIRMATIONS", 20),
-			"eip155-80001": env.GetInt("MUMBAI_CONFIRMATIONS", 5),
+			"eip155-137":      env.GetInt("POLYGON_CONFIRMATIONS", 20),
+			"eip155-80001":    env.GetInt("MUMBAI_CONFIRMATIONS", 5),
 		},
 		PollingInterval: time.Duration(env.GetInt("POLLING_INTERVAL_SECONDS", 5)) * time.Second,
 	}

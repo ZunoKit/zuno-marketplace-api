@@ -28,11 +28,11 @@ func (p *EventPublisher) PublishUserLoggedIn(ctx context.Context, event *domain.
 	}
 
 	payload := map[string]interface{}{
-		"user_id":     event.UserID,
-		"account_id":  event.AccountID,
-		"address":     event.Address,
-		"chain_id":    event.ChainID,
-		"session_id":  event.SessionID,
+		"user_id":      event.UserID,
+		"account_id":   event.AccountID,
+		"address":      event.Address,
+		"chain_id":     event.ChainID,
+		"session_id":   event.SessionID,
 		"logged_in_at": event.LoggedInAt.Format(time.RFC3339),
 	}
 	body, err := json.Marshal(payload)

@@ -45,8 +45,6 @@ func NewConfig() *Config {
 		Features:         loadFeatures(),
 	}
 
-
-
 	return config
 }
 

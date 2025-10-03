@@ -269,9 +269,9 @@ func (s *CatalogService) publishCollectionUpdatedEvent(ctx context.Context, coll
 func (s *CatalogService) publishCollectionUpsertedEvent(ctx context.Context, collection *domain.Collection, created bool) error {
 	eventType := "collection_upserted"
 	if created {
-		eventType = "collection_created" 
+		eventType = "collection_created"
 	}
-	
+
 	domainEvent := &domain.DomainEvent{
 		Schema:      "marketplace.domain.v1",
 		Version:     "1.0",

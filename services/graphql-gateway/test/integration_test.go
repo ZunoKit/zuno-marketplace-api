@@ -41,10 +41,10 @@ type GraphQLError struct {
 // IntegrationTestSuite defines the test suite for integration tests
 type IntegrationTestSuite struct {
 	suite.Suite
-	server               *httptest.Server
-	resolver             *graphql_resolver.Resolver
-	mockAuthClient       *MockAuthServiceClient
-	mockWalletClient     *MockWalletServiceClient
+	server           *httptest.Server
+	resolver         *graphql_resolver.Resolver
+	mockAuthClient   *MockAuthServiceClient
+	mockWalletClient *MockWalletServiceClient
 }
 
 func (suite *IntegrationTestSuite) SetupTest() {

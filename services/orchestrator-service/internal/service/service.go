@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/quangdang46/NFT-Marketplace/services/orchestrator-service/internal/domain"
 	protoChainRegistry "github.com/quangdang46/NFT-Marketplace/shared/proto/chainregistry"
-    "google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/metadata"
 )
 
 type Service struct {
@@ -18,7 +18,7 @@ type Service struct {
 	statusCache   domain.StatusCache
 	chainRegistry protoChainRegistry.ChainRegistryServiceClient
 	// feature flags
-	sessionLinkedIntents bool
+	sessionLinkedIntents     bool
 	sessionValidationTimeout time.Duration
 }
 
@@ -31,11 +31,11 @@ func NewOrchestrator(
 	sessionValidationTimeout time.Duration,
 ) domain.OrchestratorService {
 	return &Service{
-		repo:          repo,
-		encoder:       encoder,
-		statusCache:   statusCache,
-		chainRegistry: chainRegistry,
-		sessionLinkedIntents: sessionLinkedIntents,
+		repo:                     repo,
+		encoder:                  encoder,
+		statusCache:              statusCache,
+		chainRegistry:            chainRegistry,
+		sessionLinkedIntents:     sessionLinkedIntents,
 		sessionValidationTimeout: sessionValidationTimeout,
 	}
 }

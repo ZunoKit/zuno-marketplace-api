@@ -7,8 +7,8 @@ import (
 
 	"github.com/quangdang46/NFT-Marketplace/services/orchestrator-service/internal/domain"
 	"github.com/quangdang46/NFT-Marketplace/services/orchestrator-service/internal/service"
-	protoChainRegistry "github.com/quangdang46/NFT-Marketplace/shared/proto/chainregistry"
 	chainpb "github.com/quangdang46/NFT-Marketplace/shared/proto/chainregistry"
+	protoChainRegistry "github.com/quangdang46/NFT-Marketplace/shared/proto/chainregistry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc"

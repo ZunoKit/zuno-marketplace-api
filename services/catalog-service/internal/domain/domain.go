@@ -13,21 +13,21 @@ type Address string // EIP-55 normalized
 type Standard string // ERC721 | ERC1155 | Custom
 
 type Collection struct {
-	ID                string    `db:"id" json:"id"`
-	Slug              string    `db:"slug" json:"slug"`
-	Name              string    `db:"name" json:"name"`
-	Description       string    `db:"description" json:"description"`
-	ChainID           string    `db:"chain_id" json:"chain_id"`
-	ContractAddress   string    `db:"contract_address" json:"contract_address"`
-	Creator           string    `db:"creator" json:"creator"`
-	TxHash            string    `db:"tx_hash" json:"tx_hash"`
-	Owner             string    `db:"owner" json:"owner"`
-	CollectionType    string    `db:"collection_type" json:"collection_type"` // ERC721, ERC1155
-	MaxSupply         *big.Int  `db:"max_supply" json:"max_supply"`
-	TotalSupply       *big.Int  `db:"total_supply" json:"total_supply"`
-	RoyaltyRecipient  string    `db:"royalty_recipient" json:"royalty_recipient"`
-	RoyaltyPercentage uint16    `db:"royalty_percentage" json:"royalty_percentage"`
-	
+	ID                string   `db:"id" json:"id"`
+	Slug              string   `db:"slug" json:"slug"`
+	Name              string   `db:"name" json:"name"`
+	Description       string   `db:"description" json:"description"`
+	ChainID           string   `db:"chain_id" json:"chain_id"`
+	ContractAddress   string   `db:"contract_address" json:"contract_address"`
+	Creator           string   `db:"creator" json:"creator"`
+	TxHash            string   `db:"tx_hash" json:"tx_hash"`
+	Owner             string   `db:"owner" json:"owner"`
+	CollectionType    string   `db:"collection_type" json:"collection_type"` // ERC721, ERC1155
+	MaxSupply         *big.Int `db:"max_supply" json:"max_supply"`
+	TotalSupply       *big.Int `db:"total_supply" json:"total_supply"`
+	RoyaltyRecipient  string   `db:"royalty_recipient" json:"royalty_recipient"`
+	RoyaltyPercentage uint16   `db:"royalty_percentage" json:"royalty_percentage"`
+
 	// Minting Configuration Fields from CollectionParams
 	MintPrice              *big.Int `db:"mint_price" json:"mint_price"`
 	RoyaltyFee             *big.Int `db:"royalty_fee" json:"royalty_fee"`
@@ -37,21 +37,21 @@ type Collection struct {
 	PublicMintPrice        *big.Int `db:"public_mint_price" json:"public_mint_price"`
 	AllowlistStageDuration *big.Int `db:"allowlist_stage_duration" json:"allowlist_stage_duration"`
 	TokenURI               string   `db:"token_uri" json:"token_uri"`
-	
-	IsVerified        bool      `db:"is_verified" json:"is_verified"`
-	IsExplicit        bool      `db:"is_explicit" json:"is_explicit"`
-	IsFeatured        bool      `db:"is_featured" json:"is_featured"`
-	ImageURL          string    `db:"image_url" json:"image_url"`
-	BannerURL         string    `db:"banner_url" json:"banner_url"`
-	ExternalURL       string    `db:"external_url" json:"external_url"`
-	DiscordURL        string    `db:"discord_url" json:"discord_url"`
-	TwitterURL        string    `db:"twitter_url" json:"twitter_url"`
-	InstagramURL      string    `db:"instagram_url" json:"instagram_url"`
-	TelegramURL       string    `db:"telegram_url" json:"telegram_url"`
-	FloorPrice        *big.Int  `db:"floor_price" json:"floor_price"`
-	VolumeTraded      *big.Int  `db:"volume_traded" json:"volume_traded"`
-	CreatedAt         time.Time `db:"created_at" json:"created_at"`
-	UpdatedAt         time.Time `db:"updated_at" json:"updated_at"`
+
+	IsVerified   bool      `db:"is_verified" json:"is_verified"`
+	IsExplicit   bool      `db:"is_explicit" json:"is_explicit"`
+	IsFeatured   bool      `db:"is_featured" json:"is_featured"`
+	ImageURL     string    `db:"image_url" json:"image_url"`
+	BannerURL    string    `db:"banner_url" json:"banner_url"`
+	ExternalURL  string    `db:"external_url" json:"external_url"`
+	DiscordURL   string    `db:"discord_url" json:"discord_url"`
+	TwitterURL   string    `db:"twitter_url" json:"twitter_url"`
+	InstagramURL string    `db:"instagram_url" json:"instagram_url"`
+	TelegramURL  string    `db:"telegram_url" json:"telegram_url"`
+	FloorPrice   *big.Int  `db:"floor_price" json:"floor_price"`
+	VolumeTraded *big.Int  `db:"volume_traded" json:"volume_traded"`
+	CreatedAt    time.Time `db:"created_at" json:"created_at"`
+	UpdatedAt    time.Time `db:"updated_at" json:"updated_at"`
 }
 
 // ProcessedEvent tracks which events have been processed to ensure idempotency

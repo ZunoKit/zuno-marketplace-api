@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
-	
+
 	"github.com/quangdang46/NFT-Marketplace/services/indexer-service/internal/domain"
 )
 
@@ -53,7 +53,7 @@ func NewClient(chainID, rpcURL string, confirmationBlocks map[string]int) (*Clie
 	// Test connection
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
+
 	if _, err := client.GetLatestBlock(ctx); err != nil {
 		return nil, fmt.Errorf("failed to test connection for chain %s: %w", chainID, err)
 	}
@@ -179,7 +179,7 @@ func (c *Client) GetCollectionCreatedEventFilter(factoryAddress string, fromBloc
 	// CollectionCreated event signature
 	// event CollectionCreated(address indexed collection, address indexed creator, string name, string symbol, uint8 collectionType)
 	collectionCreatedTopic := "0x" + "4d72fe0577a3a3f7da968d7b892779dde102519c25c1838b6653ccc4b0b96d2e" // This is a placeholder, needs actual event signature
-	
+
 	return &domain.LogFilter{
 		FromBlock: fromBlock,
 		ToBlock:   nil, // Latest block
@@ -203,13 +203,13 @@ func (c *Client) ParseCollectionCreatedLog(log *domain.Log) (*domain.CollectionC
 	// For now, we'll return basic information
 	event := &domain.CollectionCreatedEvent{
 		CollectionAddress: collectionAddress,
-		Creator:          creator,
-		Name:             "", // Would be parsed from log.Data using ABI
-		Symbol:           "", // Would be parsed from log.Data using ABI
-		CollectionType:   "ERC721", // Default assumption, would be parsed from data
-		MaxSupply:        big.NewInt(0), // Would be parsed from data
-		RoyaltyRecipient: creator, // Default assumption
-		RoyaltyPercentage: 0, // Would be parsed from data
+		Creator:           creator,
+		Name:              "",            // Would be parsed from log.Data using ABI
+		Symbol:            "",            // Would be parsed from log.Data using ABI
+		CollectionType:    "ERC721",      // Default assumption, would be parsed from data
+		MaxSupply:         big.NewInt(0), // Would be parsed from data
+		RoyaltyRecipient:  creator,       // Default assumption
+		RoyaltyPercentage: 0,             // Would be parsed from data
 	}
 
 	return event, nil
@@ -232,11 +232,11 @@ func (c *Client) GetBlockRange(ctx context.Context, fromBlock, toBlock *big.Int,
 
 	var blocks []*big.Int
 	current := new(big.Int).Set(fromBlock)
-	
+
 	for current.Cmp(toBlock) <= 0 {
 		blocks = append(blocks, new(big.Int).Set(current))
 		current.Add(current, big.NewInt(1))
-		
+
 		// Limit batch size to prevent memory issues
 		if int64(len(blocks)) >= batchSize {
 			break

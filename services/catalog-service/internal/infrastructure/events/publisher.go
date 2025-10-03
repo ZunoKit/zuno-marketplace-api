@@ -13,7 +13,7 @@ import (
 const (
 	// Domain event routing keys (per CREATE.md line 74)
 	collectionDomainPrefix = "collections.domain.upserted"
-	
+
 	// Event schema versions
 	domainSchemaV1 = "marketplace.domain.v1"
 )
@@ -54,7 +54,7 @@ func (p *EventPublisher) PublishDomainEvent(ctx context.Context, event *domain.D
 			contractAddr = addr
 		}
 	}
-	
+
 	switch event.EventType {
 	case "collection_upserted", "collection_created":
 		if contractAddr != "" {
@@ -74,13 +74,13 @@ func (p *EventPublisher) PublishDomainEvent(ctx context.Context, event *domain.D
 
 	// Create message headers
 	headers := map[string]interface{}{
-		"event_type":    event.EventType,
-		"aggregate_id":  event.AggregateID,
-		"chain_id":      event.ChainID,
-		"schema":        event.Schema,
-		"version":       event.Version,
-		"published_at":  event.Timestamp.Unix(),
-		"content_type":  "application/json",
+		"event_type":   event.EventType,
+		"aggregate_id": event.AggregateID,
+		"chain_id":     event.ChainID,
+		"schema":       event.Schema,
+		"version":      event.Version,
+		"published_at": event.Timestamp.Unix(),
+		"content_type": "application/json",
 	}
 
 	// Publish message
@@ -109,33 +109,33 @@ func (p *EventPublisher) PublishCollectionUpserted(ctx context.Context, collecti
 
 	// Create domain event data
 	eventData := map[string]interface{}{
-		"id":                  collection.ID,
-		"slug":                collection.Slug,
-		"name":                collection.Name,
-		"description":         collection.Description,
-		"chain_id":            collection.ChainID,
-		"contract_address":    collection.ContractAddress,
-		"creator":             collection.Creator,
-		"owner":               collection.Owner,
-		"collection_type":     collection.CollectionType,
-		"max_supply":          collection.MaxSupply.String(),
-		"total_supply":        collection.TotalSupply.String(),
-		"royalty_recipient":   collection.RoyaltyRecipient,
-		"royalty_percentage":  collection.RoyaltyPercentage,
-		"is_verified":         collection.IsVerified,
-		"is_explicit":         collection.IsExplicit,
-		"is_featured":         collection.IsFeatured,
-		"image_url":           collection.ImageURL,
-		"banner_url":          collection.BannerURL,
-		"external_url":        collection.ExternalURL,
-		"discord_url":         collection.DiscordURL,
-		"twitter_url":         collection.TwitterURL,
-		"instagram_url":       collection.InstagramURL,
-		"telegram_url":        collection.TelegramURL,
-		"floor_price":         collection.FloorPrice.String(),
-		"volume_traded":       collection.VolumeTraded.String(),
-		"created_at":          collection.CreatedAt,
-		"updated_at":          collection.UpdatedAt,
+		"id":                 collection.ID,
+		"slug":               collection.Slug,
+		"name":               collection.Name,
+		"description":        collection.Description,
+		"chain_id":           collection.ChainID,
+		"contract_address":   collection.ContractAddress,
+		"creator":            collection.Creator,
+		"owner":              collection.Owner,
+		"collection_type":    collection.CollectionType,
+		"max_supply":         collection.MaxSupply.String(),
+		"total_supply":       collection.TotalSupply.String(),
+		"royalty_recipient":  collection.RoyaltyRecipient,
+		"royalty_percentage": collection.RoyaltyPercentage,
+		"is_verified":        collection.IsVerified,
+		"is_explicit":        collection.IsExplicit,
+		"is_featured":        collection.IsFeatured,
+		"image_url":          collection.ImageURL,
+		"banner_url":         collection.BannerURL,
+		"external_url":       collection.ExternalURL,
+		"discord_url":        collection.DiscordURL,
+		"twitter_url":        collection.TwitterURL,
+		"instagram_url":      collection.InstagramURL,
+		"telegram_url":       collection.TelegramURL,
+		"floor_price":        collection.FloorPrice.String(),
+		"volume_traded":      collection.VolumeTraded.String(),
+		"created_at":         collection.CreatedAt,
+		"updated_at":         collection.UpdatedAt,
 	}
 
 	// Create domain event
@@ -197,24 +197,24 @@ func (p *EventPublisher) PublishCollectionUpdated(ctx context.Context, collectio
 
 	// Create domain event data
 	eventData := map[string]interface{}{
-		"id":               collection.ID,
-		"slug":             collection.Slug,
-		"name":             collection.Name,
-		"description":      collection.Description,
-		"owner":            collection.Owner,
-		"is_verified":      collection.IsVerified,
-		"is_explicit":      collection.IsExplicit,
-		"is_featured":      collection.IsFeatured,
-		"image_url":        collection.ImageURL,
-		"banner_url":       collection.BannerURL,
-		"external_url":     collection.ExternalURL,
-		"discord_url":      collection.DiscordURL,
-		"twitter_url":      collection.TwitterURL,
-		"instagram_url":    collection.InstagramURL,
-		"telegram_url":     collection.TelegramURL,
-		"floor_price":      collection.FloorPrice.String(),
-		"volume_traded":    collection.VolumeTraded.String(),
-		"updated_at":       collection.UpdatedAt,
+		"id":            collection.ID,
+		"slug":          collection.Slug,
+		"name":          collection.Name,
+		"description":   collection.Description,
+		"owner":         collection.Owner,
+		"is_verified":   collection.IsVerified,
+		"is_explicit":   collection.IsExplicit,
+		"is_featured":   collection.IsFeatured,
+		"image_url":     collection.ImageURL,
+		"banner_url":    collection.BannerURL,
+		"external_url":  collection.ExternalURL,
+		"discord_url":   collection.DiscordURL,
+		"twitter_url":   collection.TwitterURL,
+		"instagram_url": collection.InstagramURL,
+		"telegram_url":  collection.TelegramURL,
+		"floor_price":   collection.FloorPrice.String(),
+		"volume_traded": collection.VolumeTraded.String(),
+		"updated_at":    collection.UpdatedAt,
 	}
 
 	// Create domain event

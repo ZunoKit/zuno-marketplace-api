@@ -23,7 +23,7 @@ func Load() *Config {
 	redisPort, _ := strconv.Atoi(env.GetString("REDIS_PORT", "6379"))
 
 	return &Config{
-			GRPC: GRPCConfig{Port: env.GetString("CHAIN_REGISTRY_GRPC_PORT", ":50056")},
+		GRPC: GRPCConfig{Port: env.GetString("CHAIN_REGISTRY_GRPC_PORT", ":50056")},
 		Postgres: shpg.PostgresConfig{
 			PostgresHost:     env.GetString("POSTGRES_HOST", "localhost"),
 			PostgresPort:     postgresPort,

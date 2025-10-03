@@ -23,18 +23,17 @@ import (
 
 	protoUser "github.com/quangdang46/NFT-Marketplace/shared/proto/user"
 	protoWallet "github.com/quangdang46/NFT-Marketplace/shared/proto/wallet"
-
 )
 
 type Service struct {
-	authRepo      domain.AuthRepository
-	userService   protoUser.UserServiceClient     // gRPC client to user service
-	walletService protoWallet.WalletServiceClient // gRPC client to wallet service
-	publisher     domain.AuthEventPublisher       // event publisher
-	jwtSecret     []byte
-	refreshSecret []byte
-	nonceTTL      time.Duration
-	sessionTTL    time.Duration
+	authRepo                domain.AuthRepository
+	userService             protoUser.UserServiceClient     // gRPC client to user service
+	walletService           protoWallet.WalletServiceClient // gRPC client to wallet service
+	publisher               domain.AuthEventPublisher       // event publisher
+	jwtSecret               []byte
+	refreshSecret           []byte
+	nonceTTL                time.Duration
+	sessionTTL              time.Duration
 	enableCollectionContext bool
 }
 
@@ -47,14 +46,14 @@ func NewAuthService(
 	enableCollectionContext bool,
 ) domain.AuthService {
 	return &Service{
-		authRepo:      authRepo,
-		userService:   userService,
-		walletService: walletService,
-		publisher:     publisher,
-		jwtSecret:     jwtSecret,
-		refreshSecret: refreshSecret,
-		nonceTTL:      5 * time.Minute,
-		sessionTTL:    24 * time.Hour,
+		authRepo:                authRepo,
+		userService:             userService,
+		walletService:           walletService,
+		publisher:               publisher,
+		jwtSecret:               jwtSecret,
+		refreshSecret:           refreshSecret,
+		nonceTTL:                5 * time.Minute,
+		sessionTTL:              24 * time.Hour,
 		enableCollectionContext: enableCollectionContext,
 	}
 }
@@ -174,8 +173,8 @@ func (s *Service) VerifySiwe(ctx context.Context, accountID, message, signature 
 				correlationID := uuid.New().String()
 				ctxObj := map[string]any{
 					"prepareCollection": true,
-					"requestedAt":      now.UTC().Format(time.RFC3339Nano),
-					"correlationId":    correlationID,
+					"requestedAt":       now.UTC().Format(time.RFC3339Nano),
+					"correlationId":     correlationID,
 				}
 				b, _ := json.Marshal(ctxObj)
 				jsonStr := string(b)

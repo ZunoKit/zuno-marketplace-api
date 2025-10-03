@@ -16,9 +16,7 @@ type Repository struct {
 	redis *redis.Redis
 }
 
-
 type txRepo struct{ tx *sql.Tx }
-
 
 func NewUserRepository(db *postgres.Postgres, redis *redis.Redis) domain.UserRepository {
 	return &Repository{db: db, redis: redis}
@@ -38,11 +36,11 @@ func (r *Repository) GetUserIDByAccount(ctx context.Context, accountID string) (
 	return userID, nil
 }
 
-
-
 func (r *Repository) WithTx(ctx context.Context, fn func(domain.TxUserRepository) error) error {
 	tx, err := r.db.GetClient().BeginTx(ctx, nil)
-	if err != nil { return domain.NewDatabaseError("begin_tx", err) }
+	if err != nil {
+		return domain.NewDatabaseError("begin_tx", err)
+	}
 	w := &txRepo{tx: tx}
 	if err := fn(w); err != nil {
 		_ = tx.Rollback()
@@ -67,7 +65,6 @@ func (t *txRepo) AcquireAccountLock(ctx context.Context, accountID string) error
 	}
 	return nil
 }
-
 
 func (t *txRepo) GetUserIDByAccountTx(ctx context.Context, accountID string) (string, error) {
 	const q = `SELECT user_id FROM user_accounts WHERE account_id = $1 LIMIT 1`

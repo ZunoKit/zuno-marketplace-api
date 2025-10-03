@@ -267,10 +267,10 @@ func (suite *MiddlewareTestSuite) TestGetRefreshTokenFromCookie_NoCookie() {
 
 func (suite *MiddlewareTestSuite) TestGetClientInfo() {
 	testCases := []struct {
-		name           string
-		headers        map[string]string
-		expectedIP     string
-		expectedUA     string
+		name       string
+		headers    map[string]string
+		expectedIP string
+		expectedUA string
 	}{
 		{
 			name: "direct_connection",
@@ -310,7 +310,7 @@ func (suite *MiddlewareTestSuite) TestGetClientInfo() {
 			}
 
 			ip, userAgent := middleware.GetClientInfo(req)
-			
+
 			if tc.name == "direct_connection" {
 				assert.Equal(t, tc.expectedIP, ip)
 			} else {
@@ -322,7 +322,7 @@ func (suite *MiddlewareTestSuite) TestGetClientInfo() {
 }
 
 func TestMiddlewareTestSuite(t *testing.T) {
-    suite.Run(t, new(MiddlewareTestSuite))
+	suite.Run(t, new(MiddlewareTestSuite))
 }
 
 // Test protected operations
@@ -456,7 +456,7 @@ func TestValidateJWTToken(t *testing.T) {
 func TestCookieOperations(t *testing.T) {
 	t.Run("SetAndGetRefreshToken", func(t *testing.T) {
 		refreshToken := "test-refresh-token-123"
-		
+
 		// Set cookie
 		w := httptest.NewRecorder()
 		middleware.SetRefreshTokenCookie(w, refreshToken)
@@ -478,7 +478,7 @@ func TestCookieOperations(t *testing.T) {
 
 		cookies := w.Result().Cookies()
 		assert.Len(t, cookies, 1)
-		
+
 		cookie := cookies[0]
 		assert.Equal(t, "refresh_token", cookie.Name)
 		assert.Equal(t, "", cookie.Value)
@@ -564,7 +564,7 @@ func TestGetClientInfo(t *testing.T) {
 // Test middleware chain
 func TestMiddlewareChain(t *testing.T) {
 	jwtSecret := []byte("test-secret")
-	
+
 	// Create a valid JWT token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub":        "user-123",
@@ -611,7 +611,7 @@ func TestMiddlewareChain(t *testing.T) {
 // Benchmark tests
 func BenchmarkAuthMiddleware(b *testing.B) {
 	jwtSecret := []byte("test-secret")
-	
+
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub":        "user-123",
 		"session_id": "session-456",

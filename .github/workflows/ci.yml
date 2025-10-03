@@ -41,32 +41,10 @@ jobs:
         with:
           go-version: '1.24.5'
 
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('go.sum', 'go.mod') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-            ${{ runner.os }}-
-
-      - name: Cache golangci-lint
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/golangci-lint
-          key: ${{ runner.os }}-golangci-lint-${{ hashFiles('.golangci.yml') }}
-          restore-keys: |
-            ${{ runner.os }}-golangci-lint-
-
-      - name: Cache tools
-        uses: actions/cache@v4
-        with:
-          path: ~/go/bin
-          key: ${{ runner.os }}-tools-${{ hashFiles('go.mod') }}
-          restore-keys: |
-            ${{ runner.os }}-tools-
+      - name: Download dependencies
+        run: |
+          go mod download
+          go mod tidy
 
       - name: Install tools
         run: |
@@ -79,7 +57,7 @@ jobs:
           if [ -n "$unformatted" ]; then
             echo "❌ The following files are not formatted:"
             echo "$unformatted"
-            echo "Please run 'gofmt -s -w .' to format your code."
+            echo "Please run 'go fmt ./...' to format your code."
             exit 1
           fi
 
@@ -164,38 +142,10 @@ jobs:
         with:
           go-version: '1.24.5'
 
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('go.sum', 'go.mod') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
       - name: Download dependencies
         run: |
           go mod download
           go mod tidy
-
-      - name: Cache protoc
-        uses: actions/cache@v4
-        with:
-          path: |
-            /usr/local/bin/protoc
-            /usr/local/include/google/protobuf
-          key: ${{ runner.os }}-protoc-3.21.12
-          restore-keys: |
-            ${{ runner.os }}-protoc-
-
-      - name: Cache protobuf tools
-        uses: actions/cache@v4
-        with:
-          path: ~/go/bin
-          key: ${{ runner.os }}-protobuf-tools-${{ hashFiles('go.mod') }}
-          restore-keys: |
-            ${{ runner.os }}-protobuf-tools-
 
       - name: Generate protobuf
         run: |
@@ -225,12 +175,6 @@ jobs:
         run: |
           go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
         continue-on-error: true
-
-      - name: Cache test coverage
-        uses: actions/cache@v4
-        with:
-          path: coverage.out
-          key: ${{ runner.os }}-coverage-${{ github.sha }}
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -265,38 +209,10 @@ jobs:
         with:
           go-version: '1.24.5'
 
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('go.sum', 'go.mod') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
       - name: Download dependencies
         run: |
           go mod download
           go mod tidy
-
-      - name: Cache protoc
-        uses: actions/cache@v4
-        with:
-          path: |
-            /usr/local/bin/protoc
-            /usr/local/include/google/protobuf
-          key: ${{ runner.os }}-protoc-3.21.12
-          restore-keys: |
-            ${{ runner.os }}-protoc-
-
-      - name: Cache protobuf tools
-        uses: actions/cache@v4
-        with:
-          path: ~/go/bin
-          key: ${{ runner.os }}-protobuf-tools-${{ hashFiles('go.mod') }}
-          restore-keys: |
-            ${{ runner.os }}-protobuf-tools-
 
       - name: Generate protobuf
         run: |
@@ -338,16 +254,8 @@ jobs:
         with:
           go-version: '1.24.5'
 
-      - name: Cache Security Tools
-        uses: actions/cache@v4
-        with:
-          path: ~/go/bin
-          key: ${{ runner.os }}-security-tools-gosec-v2
-          restore-keys: |
-            ${{ runner.os }}-security-tools-
-
       - name: Install Gosec
-        run: go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+        run: curl -sfL https://raw.githubusercontent.com/securego/gosec/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
 
       - name: Run Gosec Security Scanner
         run: |

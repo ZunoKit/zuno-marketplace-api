@@ -69,12 +69,12 @@ func (s *WalletGRPCServer) UpsertLink(ctx context.Context, req *wallet.UpsertLin
 }
 
 func (s *WalletGRPCServer) validateUpsertLinkRequest(req *wallet.UpsertLinkRequest) error {
-    if req == nil {
-        return fmt.Errorf("request cannot be nil")
-    }
-    if req.UserId == "" {
-        return fmt.Errorf("user_id is required")
-    }
+	if req == nil {
+		return fmt.Errorf("request cannot be nil")
+	}
+	if req.UserId == "" {
+		return fmt.Errorf("user_id is required")
+	}
 
 	if req.AccountId == "" {
 		return fmt.Errorf("account_id is required")
@@ -102,7 +102,6 @@ func (s *WalletGRPCServer) requestToDomain(req *wallet.UpsertLinkRequest) domain
 	}
 }
 
-
 func (s *WalletGRPCServer) domainLinkToProto(link *domain.WalletLink) *wallet.WalletLink {
 	protoLink := &wallet.WalletLink{
 		Id:        link.ID,
@@ -122,20 +121,19 @@ func (s *WalletGRPCServer) domainLinkToProto(link *domain.WalletLink) *wallet.Wa
 	return protoLink
 }
 
-
 func (s *WalletGRPCServer) domainToResponse(result *domain.WalletUpsertResult) *wallet.UpsertLinkResponse {
-    return &wallet.UpsertLinkResponse{
-        Link:           s.domainLinkToProto(result.Link),
-        Created:        result.Created,
-        PrimaryChanged: result.PrimaryChanged,
-    }
+	return &wallet.UpsertLinkResponse{
+		Link:           s.domainLinkToProto(result.Link),
+		Created:        result.Created,
+		PrimaryChanged: result.PrimaryChanged,
+	}
 }
 
 // Exposed helper wrappers for testing
 func (s *WalletGRPCServer) DomainLinkToProto(link *domain.WalletLink) *wallet.WalletLink {
-    return s.domainLinkToProto(link)
+	return s.domainLinkToProto(link)
 }
 
 func (s *WalletGRPCServer) RequestToDomain(req *wallet.UpsertLinkRequest) domain.WalletLink {
-    return s.requestToDomain(req)
+	return s.requestToDomain(req)
 }

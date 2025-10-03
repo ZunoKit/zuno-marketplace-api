@@ -69,7 +69,7 @@ func (s *SubscriptionWorkerService) ProcessCollectionUpserted(ctx context.Contex
 
 	// Primary intent resolution: Match by tx_hash first (per CREATE.md line 80)
 	var resolvedIntents []*domain.IntentStatus
-	
+
 	if txHash != "" {
 		txIntents, err := s.intentRepo.GetIntentsByTxHash(ctx, event.ChainID, txHash)
 		if err != nil {
@@ -107,7 +107,7 @@ func (s *SubscriptionWorkerService) ProcessCollectionUpserted(ctx context.Contex
 	}
 
 	if len(resolvedIntents) == 0 {
-		log.Printf("No matching intents found for collection event: contract=%s, chain=%s, tx=%s", 
+		log.Printf("No matching intents found for collection event: contract=%s, chain=%s, tx=%s",
 			contractAddress, event.ChainID, txHash)
 	} else {
 		log.Printf("Successfully resolved %d intents", len(resolvedIntents))
@@ -122,12 +122,12 @@ func (s *SubscriptionWorkerService) resolveIntentWithCollection(ctx context.Cont
 	intent.Status = "ready"
 	intent.ContractAddress = event.Data["contract_address"].(string)
 	intent.ChainID = event.ChainID
-	
+
 	// Add collection data to intent
 	if intent.Data == nil {
 		intent.Data = make(map[string]interface{})
 	}
-	
+
 	// Copy relevant collection data
 	intent.Data["collection_id"] = event.AggregateID
 	intent.Data["collection_name"] = event.Data["name"]
@@ -136,7 +136,7 @@ func (s *SubscriptionWorkerService) resolveIntentWithCollection(ctx context.Cont
 	intent.Data["creator"] = event.Data["creator"]
 	intent.Data["collection_type"] = event.Data["collection_type"]
 	intent.Data["chain_id"] = event.ChainID
-	
+
 	if txHash, exists := event.Data["tx_hash"]; exists {
 		intent.TxHash = txHash.(string)
 		intent.Data["tx_hash"] = txHash
@@ -359,7 +359,7 @@ func (s *SubscriptionWorkerService) MonitorIntents(ctx context.Context) error {
 // Helper function to match intent criteria with collection data
 func (s *SubscriptionWorkerService) matchesIntentCriteria(intent *domain.IntentStatus, collectionData map[string]interface{}) bool {
 	// Basic matching logic - in a real implementation, this would be more sophisticated
-	
+
 	// Match by contract address
 	if intent.ContractAddress != "" {
 		if contractAddr, ok := collectionData["contract_address"].(string); ok {
@@ -388,6 +388,6 @@ func (s *SubscriptionWorkerService) matchesIntentCriteria(intent *domain.IntentS
 	}
 
 	// Additional criteria can be added based on intent.Data content
-	
+
 	return true
 }

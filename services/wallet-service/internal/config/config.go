@@ -11,10 +11,10 @@ import (
 
 // Config contains configuration for Wallet Service
 type Config struct {
-	GRPCPort    string
-	Postgres    postgres.PostgresConfig
-	Redis       redis.RedisConfig
-	RabbitMQ    messaging.RabbitMQConfig
+	GRPCPort string
+	Postgres postgres.PostgresConfig
+	Redis    redis.RedisConfig
+	RabbitMQ messaging.RabbitMQConfig
 }
 
 // LoadConfig loads configuration from environment variables
@@ -22,10 +22,10 @@ func LoadConfig() *Config {
 	log.Println("Loading Wallet Service configuration...")
 
 	config := &Config{
-		GRPCPort:    env.GetString("WALLET_GRPC_PORT", ":50053"),
-		Postgres:    loadPostgresConfig(),
-		Redis:       loadRedisConfig(),
-		RabbitMQ:    loadRabbitMQConfig(),
+		GRPCPort: env.GetString("WALLET_GRPC_PORT", ":50053"),
+		Postgres: loadPostgresConfig(),
+		Redis:    loadRedisConfig(),
+		RabbitMQ: loadRabbitMQConfig(),
 	}
 
 	log.Printf("Wallet Service config loaded - gRPC: %s",

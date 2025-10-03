@@ -110,13 +110,13 @@ func (r *Repo) FindByChainTx(ctx context.Context, chainID domain.ChainID, txHash
 }
 
 func (r *Repo) InsertSessionIntentAudit(ctx context.Context, sessionID string, intentID string, userID *string, auditData any) error {
-    payload, err := json.Marshal(auditData)
-    if err != nil {
-        return fmt.Errorf("marshal audit: %w", err)
-    }
-    _, err = r.pg.GetClient().ExecContext(ctx, InsertSessionIntentAuditQuery, sessionID, intentID, userID, payload)
-    if err != nil {
-        return fmt.Errorf("insert session_intent_audit: %w", err)
-    }
-    return nil
+	payload, err := json.Marshal(auditData)
+	if err != nil {
+		return fmt.Errorf("marshal audit: %w", err)
+	}
+	_, err = r.pg.GetClient().ExecContext(ctx, InsertSessionIntentAuditQuery, sessionID, intentID, userID, payload)
+	if err != nil {
+		return fmt.Errorf("insert session_intent_audit: %w", err)
+	}
+	return nil
 }

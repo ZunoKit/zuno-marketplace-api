@@ -81,7 +81,7 @@ func (r *WebSocketSubscriptionResolver) OnIntentStatus(ctx context.Context, inte
 			if recoveryErr := recover(); recoveryErr != nil {
 				log.Printf("Recovered from panic in OnIntentStatus for %s: %v", intentID, recoveryErr)
 			}
-			
+
 			// Cleanup on exit
 			r.cleanupSubscription(intentID)
 			close(statusChan)
@@ -92,7 +92,7 @@ func (r *WebSocketSubscriptionResolver) OnIntentStatus(ctx context.Context, inte
 			subscription.mu.Lock()
 			subscription.lastStatus = initialStatus
 			subscription.mu.Unlock()
-			
+
 			select {
 			case statusChan <- initialStatus:
 				log.Printf("Sent initial status for intent %s: %s", intentID, initialStatus.Status)

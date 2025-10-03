@@ -109,14 +109,14 @@ func (suite *UserServiceTestSuite) TestEnsureUser_NewUser() {
 	suite.mockRepo.On("WithTx", ctx, mock.AnythingOfType("func(domain.TxUserRepository) error")).
 		Run(func(args mock.Arguments) {
 			fn := args.Get(1).(func(domain.TxUserRepository) error)
-			
+
 			// Mock transaction operations
 			mockTxRepo.On("AcquireAccountLock", ctx, accountID).Return(nil)
 			mockTxRepo.On("GetUserIDByAccountTx", ctx, accountID).Return("", domain.ErrUserNotFound)
 			mockTxRepo.On("CreateUserTx", ctx).Return(newUserID, nil)
 			mockTxRepo.On("CreateProfileTx", ctx, newUserID).Return(nil)
 			mockTxRepo.On("UpsertUserAccountTx", ctx, newUserID, accountID, address, chainID).Return(nil)
-			
+
 			fn(mockTxRepo)
 		}).Return(nil)
 
@@ -146,12 +146,12 @@ func (suite *UserServiceTestSuite) TestEnsureUser_ExistingUserInTransaction() {
 	suite.mockRepo.On("WithTx", ctx, mock.AnythingOfType("func(domain.TxUserRepository) error")).
 		Run(func(args mock.Arguments) {
 			fn := args.Get(1).(func(domain.TxUserRepository) error)
-			
+
 			// Mock transaction operations
 			mockTxRepo.On("AcquireAccountLock", ctx, accountID).Return(nil)
 			mockTxRepo.On("GetUserIDByAccountTx", ctx, accountID).Return(existingUserID, nil)
 			mockTxRepo.On("TouchUserAccountTx", ctx, accountID, address).Return(nil)
-			
+
 			fn(mockTxRepo)
 		}).Return(nil)
 
@@ -167,7 +167,7 @@ func (suite *UserServiceTestSuite) TestEnsureUser_ExistingUserInTransaction() {
 
 func (suite *UserServiceTestSuite) TestEnsureUser_InvalidAccountID() {
 	ctx := context.Background()
-	
+
 	testCases := []struct {
 		name      string
 		accountID string
@@ -191,7 +191,7 @@ func (suite *UserServiceTestSuite) TestEnsureUser_InvalidAccountID() {
 	for _, tc := range testCases {
 		suite.T().Run(tc.name, func(t *testing.T) {
 			result, err := suite.userService.EnsureUser(ctx, tc.accountID, tc.address, tc.chainID)
-			
+
 			assert.Error(t, err)
 			assert.Nil(t, result)
 			assert.Contains(t, err.Error(), "invalid_input")
@@ -201,7 +201,7 @@ func (suite *UserServiceTestSuite) TestEnsureUser_InvalidAccountID() {
 
 func (suite *UserServiceTestSuite) TestEnsureUser_InvalidAddress() {
 	ctx := context.Background()
-	
+
 	testCases := []struct {
 		name    string
 		address string
@@ -227,7 +227,7 @@ func (suite *UserServiceTestSuite) TestEnsureUser_InvalidAddress() {
 	for _, tc := range testCases {
 		suite.T().Run(tc.name, func(t *testing.T) {
 			result, err := suite.userService.EnsureUser(ctx, "test-account", tc.address, "eip155:1")
-			
+
 			assert.Error(t, err)
 			assert.Nil(t, result)
 			assert.Contains(t, err.Error(), "invalid_input")
@@ -296,13 +296,13 @@ func TestValidateAccountID(t *testing.T) {
 		"user123",
 		"account_with_underscore",
 		"account-with-dash",
-		"a", // minimum length
+		"a",                       // minimum length
 		string(make([]byte, 255)), // maximum length
 	}
 
 	invalidAccountIDs := []string{
-		"",                         // empty
-		string(make([]byte, 256)),  // too long
+		"",                        // empty
+		string(make([]byte, 256)), // too long
 	}
 
 	for _, accountID := range validAccountIDs {
@@ -323,12 +323,12 @@ func TestValidateAddress(t *testing.T) {
 	}
 
 	invalidAddresses := []string{
-		"",                                           // empty
-		"1234567890123456789012345678901234567890",   // missing 0x
-		"0x123",                                      // too short
+		"", // empty
+		"1234567890123456789012345678901234567890", // missing 0x
+		"0x123", // too short
 		"0x12345678901234567890123456789012345678901", // too long
-		"0x123456789012345678901234567890123456789g", // invalid hex
-		"0X1234567890123456789012345678901234567890", // uppercase X
+		"0x123456789012345678901234567890123456789g",  // invalid hex
+		"0X1234567890123456789012345678901234567890",  // uppercase X
 	}
 
 	for _, address := range validAddresses {
@@ -341,17 +341,17 @@ func TestValidateAddress(t *testing.T) {
 }
 
 func TestValidateChainID(t *testing.T) {
-    validChainIDs := []string{
-        "eip155:1",
-        "eip155:137",
-        "cosmos:cosmoshub-4",
-        "bip122:000000000019d6689c085ae165831e93",
-        "a:b", // minimum format
-    }
+	validChainIDs := []string{
+		"eip155:1",
+		"eip155:137",
+		"cosmos:cosmoshub-4",
+		"bip122:000000000019d6689c085ae165831e93",
+		"a:b", // minimum format
+	}
 
-    invalidChainIDs := []string{
-        "", // empty only (current validation)
-    }
+	invalidChainIDs := []string{
+		"", // empty only (current validation)
+	}
 
 	for _, chainID := range validChainIDs {
 		assert.NoError(t, domain.ValidateChainID(chainID), "Expected %s to be valid", chainID)
@@ -367,7 +367,7 @@ func BenchmarkEnsureUser_ExistingUser(b *testing.B) {
 	mockRepo := new(MockUserRepository)
 	userService := service.NewUserService(mockRepo)
 	ctx := context.Background()
-	
+
 	mockRepo.On("GetUserIDByAccount", mock.Anything, mock.Anything).
 		Return("user-123", nil)
 
@@ -379,7 +379,7 @@ func BenchmarkEnsureUser_ExistingUser(b *testing.B) {
 
 func BenchmarkValidateAddress(b *testing.B) {
 	address := "0x1234567890123456789012345678901234567890"
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		domain.ValidateAddress(address)
@@ -388,7 +388,7 @@ func BenchmarkValidateAddress(b *testing.B) {
 
 func BenchmarkValidateAccountID(b *testing.B) {
 	accountID := "test-account-123"
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		domain.ValidateAccountID(accountID)

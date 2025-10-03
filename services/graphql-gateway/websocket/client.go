@@ -51,7 +51,7 @@ type Client struct {
 // NewClient creates a new WebSocket client
 func NewClient(subscriptionWorkerURL string) *Client {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	return &Client{
 		url:               subscriptionWorkerURL,
 		subscriptions:     make(map[string][]SubscriptionCallback),
@@ -112,12 +112,12 @@ func (c *Client) Subscribe(intentID string, callback SubscriptionCallback) error
 			"type":      "subscribe",
 			"intent_id": intentID,
 		}
-		
+
 		if err := c.conn.WriteJSON(subscribeMsg); err != nil {
 			log.Printf("Failed to send subscribe message for intent %s: %v", intentID, err)
 			return err
 		}
-		
+
 		log.Printf("Subscribed to intent updates: %s", intentID)
 	}
 
@@ -137,12 +137,12 @@ func (c *Client) Unsubscribe(intentID string) error {
 			"type":      "unsubscribe",
 			"intent_id": intentID,
 		}
-		
+
 		if err := c.conn.WriteJSON(unsubscribeMsg); err != nil {
 			log.Printf("Failed to send unsubscribe message for intent %s: %v", intentID, err)
 			return err
 		}
-		
+
 		log.Printf("Unsubscribed from intent updates: %s", intentID)
 	}
 
@@ -269,7 +269,7 @@ func (c *Client) ping() {
 		pingMsg := map[string]string{
 			"type": "ping",
 		}
-		
+
 		if err := conn.WriteJSON(pingMsg); err != nil {
 			log.Printf("Failed to send ping: %v", err)
 			c.handleDisconnection()
@@ -325,7 +325,7 @@ func (c *Client) reconnect() {
 			"type":      "subscribe",
 			"intent_id": intentID,
 		}
-		
+
 		if err := c.conn.WriteJSON(subscribeMsg); err != nil {
 			log.Printf("Failed to resubscribe to intent %s: %v", intentID, err)
 		} else {

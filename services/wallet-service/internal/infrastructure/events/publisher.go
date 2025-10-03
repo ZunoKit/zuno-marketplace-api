@@ -45,27 +45,25 @@ func (p *EventPublisher) PublishWalletLinked(ctx context.Context, event *domain.
 	}
 
 	// Publish to wallets.events exchange with routing key "wallet.linked"
-    if err := p.amqp.Publish(ctx, contracts.AMQPMessage{
-        Exchange:   contracts.WalletsExchange,
-        RoutingKey: contracts.WalletLinkedKey,
-        Body:       body,
-        Headers: map[string]interface{}{
-            "event_type":   "wallet.linked",
-            "schema":       "wallet.linked.v1",
-            "published_at": time.Now().Format(time.RFC3339),
-            "service":      "wallet-service",
-        },
-    }); err != nil {
-        return fmt.Errorf("failed to publish wallet linked event: %w", err)
-    }
-    return nil
+	if err := p.amqp.Publish(ctx, contracts.AMQPMessage{
+		Exchange:   contracts.WalletsExchange,
+		RoutingKey: contracts.WalletLinkedKey,
+		Body:       body,
+		Headers: map[string]interface{}{
+			"event_type":   "wallet.linked",
+			"schema":       "wallet.linked.v1",
+			"published_at": time.Now().Format(time.RFC3339),
+			"service":      "wallet-service",
+		},
+	}); err != nil {
+		return fmt.Errorf("failed to publish wallet linked event: %w", err)
+	}
+	return nil
 }
-
-
 
 // generateEventID generates a unique event ID
 func generateEventID() string {
-    return fmt.Sprintf("wallet_%d", time.Now().UnixNano())
+	return fmt.Sprintf("wallet_%d", time.Now().UnixNano())
 }
 
 // GenerateEventID exposes event ID generation for testing

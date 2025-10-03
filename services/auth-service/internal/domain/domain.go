@@ -11,14 +11,13 @@ type Address = string
 type ChainID = string // CAIP-2
 
 type AuthUserLoggedInEvent struct {
-	UserID    UserID
-	AccountID string
-	Address   Address
-	ChainID   ChainID
-	SessionID SessionID
+	UserID     UserID
+	AccountID  string
+	Address    Address
+	ChainID    ChainID
+	SessionID  SessionID
 	LoggedInAt time.Time
 }
-
 
 type Nonce struct {
 	Value     string

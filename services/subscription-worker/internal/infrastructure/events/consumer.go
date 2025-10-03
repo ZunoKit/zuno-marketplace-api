@@ -11,21 +11,21 @@ import (
 
 	"github.com/streadway/amqp"
 
-	"github.com/quangdang46/NFT-Marketplace/services/subscription-worker/internal/domain"
 	"github.com/quangdang46/NFT-Marketplace/services/subscription-worker/internal/config"
+	"github.com/quangdang46/NFT-Marketplace/services/subscription-worker/internal/domain"
 	"github.com/quangdang46/NFT-Marketplace/shared/messaging"
 )
 
 type EventConsumer struct {
-	amqp                      *messaging.RabbitMQ
-	config                    config.ConsumerConfig
-	collectionEventHandler    domain.CollectionEventHandler
-	channel                   *amqp.Channel
-	deliveries               <-chan amqp.Delivery
-	done                     chan error
-	consumerTag              string
-	mu                       sync.RWMutex
-	isRunning                bool
+	amqp                   *messaging.RabbitMQ
+	config                 config.ConsumerConfig
+	collectionEventHandler domain.CollectionEventHandler
+	channel                *amqp.Channel
+	deliveries             <-chan amqp.Delivery
+	done                   chan error
+	consumerTag            string
+	mu                     sync.RWMutex
+	isRunning              bool
 }
 
 // NewEventConsumer creates a new RabbitMQ event consumer for subscription worker
@@ -121,13 +121,13 @@ func (c *EventConsumer) Start(ctx context.Context) error {
 
 	// Start consuming
 	c.deliveries, err = c.channel.Consume(
-		queue.Name,      // queue
-		c.consumerTag,   // consumer
+		queue.Name,       // queue
+		c.consumerTag,    // consumer
 		c.config.AutoAck, // auto-ack
-		false,           // exclusive
-		false,           // no-local
-		false,           // no-wait
-		nil,             // args
+		false,            // exclusive
+		false,            // no-local
+		false,            // no-wait
+		nil,              // args
 	)
 	if err != nil {
 		return fmt.Errorf("failed to start consuming: %w", err)
@@ -230,7 +230,7 @@ func (c *EventConsumer) processMessage(ctx context.Context, delivery amqp.Delive
 
 	// Determine event type from routing key
 	eventType := c.getEventTypeFromRoutingKey(delivery.RoutingKey)
-	
+
 	switch eventType {
 	case "collection_upserted", "collection_created":
 		return c.processCollectionDomainEvent(msgCtx, delivery)
@@ -366,12 +366,12 @@ func (c *EventConsumer) GetConsumerInfo() map[string]interface{} {
 	defer c.mu.RUnlock()
 
 	info := map[string]interface{}{
-		"consumer_tag":    c.consumerTag,
-		"queue_name":      c.config.QueueName,
-		"routing_keys":    c.config.RoutingKeys,
-		"prefetch_count":  c.config.PrefetchCount,
-		"auto_ack":        c.config.AutoAck,
-		"is_running":      c.isRunning,
+		"consumer_tag":   c.consumerTag,
+		"queue_name":     c.config.QueueName,
+		"routing_keys":   c.config.RoutingKeys,
+		"prefetch_count": c.config.PrefetchCount,
+		"auto_ack":       c.config.AutoAck,
+		"is_running":     c.isRunning,
 	}
 
 	if c.channel != nil {

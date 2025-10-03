@@ -17,10 +17,10 @@ import (
 
 type UserRepositoryTestSuite struct {
 	suite.Suite
-	db       *sql.DB
-	mock     sqlmock.Sqlmock
-	repo     *repository.Repository
-	mockPG   *postgres.Postgres
+	db        *sql.DB
+	mock      sqlmock.Sqlmock
+	repo      *repository.Repository
+	mockPG    *postgres.Postgres
 	mockRedis *redis.Redis
 }
 
@@ -41,9 +41,9 @@ func (suite *UserRepositoryTestSuite) TearDownTest() {
 }
 
 func (suite *UserRepositoryTestSuite) TestGetUserIDByAccount_Success() {
-    ctx := context.Background()
-    accountID := "test-account-123"
-    expectedUserID := "user-456"
+	ctx := context.Background()
+	accountID := "test-account-123"
+	expectedUserID := "user-456"
 
 	rows := sqlmock.NewRows([]string{"user_id"}).
 		AddRow(expectedUserID)
@@ -54,26 +54,26 @@ func (suite *UserRepositoryTestSuite) TestGetUserIDByAccount_Success() {
 
 	// Test structure validation
 	assert.NotEmpty(suite.T(), accountID)
-    assert.NotEmpty(suite.T(), expectedUserID)
-    _ = ctx
+	assert.NotEmpty(suite.T(), expectedUserID)
+	_ = ctx
 }
 
 func (suite *UserRepositoryTestSuite) TestGetUserIDByAccount_NotFound() {
-    ctx := context.Background()
-    accountID := "non-existent-account"
+	ctx := context.Background()
+	accountID := "non-existent-account"
 
 	suite.mock.ExpectQuery(`SELECT user_id FROM user_accounts WHERE account_id = \$1 LIMIT 1`).
 		WithArgs(accountID).
 		WillReturnError(sql.ErrNoRows)
 
-	// Test that we handle not found cases properly
-    assert.NotEmpty(suite.T(), accountID)
-    _ = ctx
+		// Test that we handle not found cases properly
+	assert.NotEmpty(suite.T(), accountID)
+	_ = ctx
 }
 
 func (suite *UserRepositoryTestSuite) TestCreateUserTx_Success() {
-    ctx := context.Background()
-    expectedUserID := "user-789"
+	ctx := context.Background()
+	expectedUserID := "user-789"
 
 	rows := sqlmock.NewRows([]string{"id"}).
 		AddRow(expectedUserID)
@@ -81,28 +81,28 @@ func (suite *UserRepositoryTestSuite) TestCreateUserTx_Success() {
 	suite.mock.ExpectQuery(`INSERT INTO users\(status, created_at\) VALUES\('active', now\(\)\) RETURNING id`).
 		WillReturnRows(rows)
 
-    assert.NotEmpty(suite.T(), expectedUserID)
-    _ = ctx
+	assert.NotEmpty(suite.T(), expectedUserID)
+	_ = ctx
 }
 
 func (suite *UserRepositoryTestSuite) TestCreateProfileTx_Success() {
-    ctx := context.Background()
-    userID := "user-789"
+	ctx := context.Background()
+	userID := "user-789"
 
 	suite.mock.ExpectExec(`INSERT INTO profiles \(user_id, locale, timezone, socials_json, updated_at\)`).
 		WithArgs(userID, domain.DefaultLocale, domain.DefaultTimezone).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
-    assert.NotEmpty(suite.T(), userID)
-    _ = ctx
+	assert.NotEmpty(suite.T(), userID)
+	_ = ctx
 }
 
 func (suite *UserRepositoryTestSuite) TestUpsertUserAccountTx_Success() {
-    ctx := context.Background()
-    userID := "user-789"
-    accountID := "test-account-123"
-    address := "0x1234567890123456789012345678901234567890"
-    chainID := "eip155:1"
+	ctx := context.Background()
+	userID := "user-789"
+	accountID := "test-account-123"
+	address := "0x1234567890123456789012345678901234567890"
+	chainID := "eip155:1"
 
 	suite.mock.ExpectExec(`INSERT INTO user_accounts \(account_id, user_id, address, chain_id, created_at, last_seen_at\)`).
 		WithArgs(accountID, userID, address, chainID).
@@ -111,16 +111,16 @@ func (suite *UserRepositoryTestSuite) TestUpsertUserAccountTx_Success() {
 	assert.NotEmpty(suite.T(), userID)
 	assert.NotEmpty(suite.T(), accountID)
 	assert.NotEmpty(suite.T(), address)
-    assert.NotEmpty(suite.T(), chainID)
-    _ = ctx
+	assert.NotEmpty(suite.T(), chainID)
+	_ = ctx
 }
 
 func (suite *UserRepositoryTestSuite) TestUpsertUserAccountTx_Conflict() {
-    ctx := context.Background()
-    userID := "user-789"
-    accountID := "existing-account"
-    address := "0x1234567890123456789012345678901234567890"
-    chainID := "eip155:1"
+	ctx := context.Background()
+	userID := "user-789"
+	accountID := "existing-account"
+	address := "0x1234567890123456789012345678901234567890"
+	chainID := "eip155:1"
 
 	// Mock conflict handling with ON CONFLICT DO UPDATE
 	suite.mock.ExpectExec(`INSERT INTO user_accounts (.+) ON CONFLICT \(account_id\) DO UPDATE SET`).
@@ -128,42 +128,42 @@ func (suite *UserRepositoryTestSuite) TestUpsertUserAccountTx_Conflict() {
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	assert.NotEmpty(suite.T(), userID)
-    assert.NotEmpty(suite.T(), accountID)
-    _ = ctx
+	assert.NotEmpty(suite.T(), accountID)
+	_ = ctx
 }
 
 func (suite *UserRepositoryTestSuite) TestTouchUserAccountTx_Success() {
-    ctx := context.Background()
-    accountID := "test-account-123"
-    address := "0x1234567890123456789012345678901234567890"
+	ctx := context.Background()
+	accountID := "test-account-123"
+	address := "0x1234567890123456789012345678901234567890"
 
 	suite.mock.ExpectExec(`UPDATE user_accounts SET last_seen_at = now\(\), address = COALESCE\(\$2, address\) WHERE account_id = \$1`).
 		WithArgs(accountID, address).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	assert.NotEmpty(suite.T(), accountID)
-    assert.NotEmpty(suite.T(), address)
-    _ = ctx
+	assert.NotEmpty(suite.T(), address)
+	_ = ctx
 }
 
 func (suite *UserRepositoryTestSuite) TestWithTx_Success() {
-    suite.T().Skip("Requires postgres.Postgres client; skipping")
+	suite.T().Skip("Requires postgres.Postgres client; skipping")
 }
 
 func (suite *UserRepositoryTestSuite) TestWithTx_Rollback() {
-    suite.T().Skip("Requires postgres.Postgres client; skipping")
+	suite.T().Skip("Requires postgres.Postgres client; skipping")
 }
 
 func (suite *UserRepositoryTestSuite) TestAcquireAccountLock_Success() {
-    ctx := context.Background()
-    accountID := "test-account-123"
+	ctx := context.Background()
+	accountID := "test-account-123"
 
 	suite.mock.ExpectExec(`SELECT pg_advisory_xact_lock\(\$1\)`).
 		WithArgs(sqlmock.AnyArg()). // Hash of account ID
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
-    assert.NotEmpty(suite.T(), accountID)
-    _ = ctx
+	assert.NotEmpty(suite.T(), accountID)
+	_ = ctx
 }
 
 func TestUserRepositoryTestSuite(t *testing.T) {
@@ -178,7 +178,7 @@ func TestUserRepositoryIntegration(t *testing.T) {
 
 	// These tests would require actual database connection
 	// You would set up a test database, run migrations, and test real operations
-	
+
 	t.Run("CreateUserAndProfile", func(t *testing.T) {
 		// Test with real database connection
 		t.Skip("Requires test database setup")
@@ -268,7 +268,7 @@ func TestDatabaseErrors(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mock.ExpectQuery(`SELECT user_id FROM user_accounts`).WillReturnError(tc.mockError)
-			
+
 			// Test error handling
 			assert.Contains(t, tc.expectedError, "database_operation_failed")
 		})

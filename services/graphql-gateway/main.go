@@ -63,7 +63,7 @@ func main() {
 	}
 
 	resolver := graphql_resolver.NewResolver(authClient, walletClient, mediaClient).WithChainRegistryClient(chainRegistryClient).WithOrchestratorClient(orchestratorClient)
-	
+
 	// Connect WebSocket client if available
 	if wsClient != nil {
 		resolver = resolver.WithWebSocketClient(wsClient)

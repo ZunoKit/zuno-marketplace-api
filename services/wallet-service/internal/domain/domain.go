@@ -56,10 +56,9 @@ type TxWalletRepository interface {
 	// Primary logic
 	GetPrimaryByUserTx(ctx context.Context, userID UserID) (*WalletLink, error) // ErrWalletNotFound nếu chưa có
 
-	  GetPrimaryByUserChainTx(ctx context.Context, userID UserID, chainID ChainID) (*WalletLink, error)
-    DemoteOtherPrimariesTx(ctx context.Context, userID UserID, chainID ChainID, keepID WalletID) error
-    UpdateWalletAddressTx(ctx context.Context, id WalletID, chainID ChainID, address Address) (*WalletLink, error)
-
+	GetPrimaryByUserChainTx(ctx context.Context, userID UserID, chainID ChainID) (*WalletLink, error)
+	DemoteOtherPrimariesTx(ctx context.Context, userID UserID, chainID ChainID, keepID WalletID) error
+	UpdateWalletAddressTx(ctx context.Context, id WalletID, chainID ChainID, address Address) (*WalletLink, error)
 }
 
 type EventPublisher interface {

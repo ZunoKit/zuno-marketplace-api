@@ -103,7 +103,7 @@ func (m *Manager) Stop(ctx context.Context) error {
 	if m.server != nil {
 		shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
-		
+
 		if err := m.server.Shutdown(shutdownCtx); err != nil {
 			return fmt.Errorf("failed to shutdown WebSocket server: %w", err)
 		}
@@ -288,10 +288,10 @@ func (m *Manager) handleHealth(w http.ResponseWriter, r *http.Request) {
 func (m *Manager) handleStats(w http.ResponseWriter, r *http.Request) {
 	m.mu.RLock()
 	stats := map[string]interface{}{
-		"connections":   len(m.connections),
-		"subscriptions": len(m.subscriptions),
+		"connections":     len(m.connections),
+		"subscriptions":   len(m.subscriptions),
 		"max_connections": m.config.MaxConnections,
-		"is_running":    m.isRunning,
+		"is_running":      m.isRunning,
 	}
 
 	// Count total subscribers
@@ -304,7 +304,7 @@ func (m *Manager) handleStats(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	
+
 	// Simple JSON encoding
 	fmt.Fprintf(w, `{
 		"connections": %d,
@@ -312,7 +312,7 @@ func (m *Manager) handleStats(w http.ResponseWriter, r *http.Request) {
 		"total_subscribers": %d,
 		"max_connections": %d,
 		"is_running": %t
-	}`, stats["connections"], stats["subscriptions"], stats["total_subscribers"], 
+	}`, stats["connections"], stats["subscriptions"], stats["total_subscribers"],
 		stats["max_connections"], stats["is_running"])
 }
 

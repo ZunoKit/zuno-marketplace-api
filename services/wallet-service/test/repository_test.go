@@ -44,7 +44,7 @@ func (suite *WalletRepositoryTestSuite) TearDownTest() {
 func (suite *WalletRepositoryTestSuite) TestGetByAccountIDTx_Success() {
 	ctx := context.Background()
 	accountID := "account-123"
-	
+
 	expectedWallet := &domain.WalletLink{
 		ID:        "wallet-456",
 		UserID:    "user-789",
@@ -57,7 +57,7 @@ func (suite *WalletRepositoryTestSuite) TestGetByAccountIDTx_Success() {
 	}
 
 	rows := sqlmock.NewRows([]string{
-		"id", "user_id", "account_id", "address", "chain_id", "is_primary", 
+		"id", "user_id", "account_id", "address", "chain_id", "is_primary",
 		"verified_at", "created_at", "updated_at",
 	}).AddRow(
 		expectedWallet.ID,
@@ -98,7 +98,7 @@ func (suite *WalletRepositoryTestSuite) TestGetByAddressTx_Success() {
 	ctx := context.Background()
 	chainID := "eip155:1"
 	address := "0x1234567890123456789012345678901234567890"
-	
+
 	expectedWallet := &domain.WalletLink{
 		ID:        "wallet-456",
 		UserID:    "user-789",
@@ -111,7 +111,7 @@ func (suite *WalletRepositoryTestSuite) TestGetByAddressTx_Success() {
 	}
 
 	rows := sqlmock.NewRows([]string{
-		"id", "user_id", "account_id", "address", "chain_id", "is_primary", 
+		"id", "user_id", "account_id", "address", "chain_id", "is_primary",
 		"verified_at", "created_at", "updated_at",
 	}).AddRow(
 		expectedWallet.ID,
@@ -137,7 +137,7 @@ func (suite *WalletRepositoryTestSuite) TestGetByAddressTx_Success() {
 
 func (suite *WalletRepositoryTestSuite) TestInsertWalletTx_Success() {
 	ctx := context.Background()
-	
+
 	link := domain.WalletLink{
 		UserID:    "user-789",
 		AccountID: "account-123",
@@ -159,7 +159,7 @@ func (suite *WalletRepositoryTestSuite) TestInsertWalletTx_Success() {
 	}
 
 	rows := sqlmock.NewRows([]string{
-		"id", "user_id", "account_id", "address", "chain_id", "is_primary", 
+		"id", "user_id", "account_id", "address", "chain_id", "is_primary",
 		"verified_at", "created_at", "updated_at",
 	}).AddRow(
 		expectedWallet.ID,
@@ -197,7 +197,7 @@ func (suite *WalletRepositoryTestSuite) TestUpdateWalletMetaTx_Success() {
 	walletID := "wallet-456"
 	isPrimary := true
 	now := time.Now()
-	
+
 	expectedWallet := &domain.WalletLink{
 		ID:         walletID,
 		UserID:     "user-789",
@@ -211,7 +211,7 @@ func (suite *WalletRepositoryTestSuite) TestUpdateWalletMetaTx_Success() {
 	}
 
 	rows := sqlmock.NewRows([]string{
-		"id", "user_id", "account_id", "address", "chain_id", "is_primary", 
+		"id", "user_id", "account_id", "address", "chain_id", "is_primary",
 		"verified_at", "created_at", "updated_at",
 	}).AddRow(
 		expectedWallet.ID,
@@ -237,7 +237,7 @@ func (suite *WalletRepositoryTestSuite) TestUpdateWalletMetaTx_Success() {
 func (suite *WalletRepositoryTestSuite) TestGetPrimaryByUserTx_Success() {
 	ctx := context.Background()
 	userID := "user-789"
-	
+
 	expectedWallet := &domain.WalletLink{
 		ID:        "wallet-456",
 		UserID:    userID,
@@ -250,7 +250,7 @@ func (suite *WalletRepositoryTestSuite) TestGetPrimaryByUserTx_Success() {
 	}
 
 	rows := sqlmock.NewRows([]string{
-		"id", "user_id", "account_id", "address", "chain_id", "is_primary", 
+		"id", "user_id", "account_id", "address", "chain_id", "is_primary",
 		"verified_at", "created_at", "updated_at",
 	}).AddRow(
 		expectedWallet.ID,
@@ -277,7 +277,7 @@ func (suite *WalletRepositoryTestSuite) TestGetPrimaryByUserChainTx_Success() {
 	ctx := context.Background()
 	userID := "user-789"
 	chainID := "eip155:1"
-	
+
 	expectedWallet := &domain.WalletLink{
 		ID:        "wallet-456",
 		UserID:    userID,
@@ -290,7 +290,7 @@ func (suite *WalletRepositoryTestSuite) TestGetPrimaryByUserChainTx_Success() {
 	}
 
 	rows := sqlmock.NewRows([]string{
-		"id", "user_id", "account_id", "address", "chain_id", "is_primary", 
+		"id", "user_id", "account_id", "address", "chain_id", "is_primary",
 		"verified_at", "created_at", "updated_at",
 	}).AddRow(
 		expectedWallet.ID,
@@ -315,7 +315,7 @@ func (suite *WalletRepositoryTestSuite) TestGetPrimaryByUserChainTx_Success() {
 }
 
 func (suite *WalletRepositoryTestSuite) TestDemoteOtherPrimariesTx_Success() {
-    ctx := context.Background()
+	ctx := context.Background()
 	userID := "user-789"
 	chainID := "eip155:1"
 	keepID := "wallet-456"
@@ -326,8 +326,8 @@ func (suite *WalletRepositoryTestSuite) TestDemoteOtherPrimariesTx_Success() {
 
 	assert.NotEmpty(suite.T(), userID)
 	assert.NotEmpty(suite.T(), chainID)
-    assert.NotEmpty(suite.T(), keepID)
-    _ = ctx
+	assert.NotEmpty(suite.T(), keepID)
+	_ = ctx
 }
 
 func (suite *WalletRepositoryTestSuite) TestUpdateWalletAddressTx_Success() {
@@ -335,7 +335,7 @@ func (suite *WalletRepositoryTestSuite) TestUpdateWalletAddressTx_Success() {
 	walletID := "wallet-456"
 	chainID := "eip155:137"
 	newAddress := "0x9876543210987654321098765432109876543210"
-	
+
 	expectedWallet := &domain.WalletLink{
 		ID:        walletID,
 		UserID:    "user-789",
@@ -348,7 +348,7 @@ func (suite *WalletRepositoryTestSuite) TestUpdateWalletAddressTx_Success() {
 	}
 
 	rows := sqlmock.NewRows([]string{
-		"id", "user_id", "account_id", "address", "chain_id", "is_primary", 
+		"id", "user_id", "account_id", "address", "chain_id", "is_primary",
 		"verified_at", "created_at", "updated_at",
 	}).AddRow(
 		expectedWallet.ID,
@@ -386,7 +386,7 @@ func (suite *WalletRepositoryTestSuite) TestAcquireAccountLock_Success() {
 }
 
 func (suite *WalletRepositoryTestSuite) TestAcquireAddressLock_Success() {
-    ctx := context.Background()
+	ctx := context.Background()
 	chainID := "eip155:1"
 	address := "0x1234567890123456789012345678901234567890"
 
@@ -395,8 +395,8 @@ func (suite *WalletRepositoryTestSuite) TestAcquireAddressLock_Success() {
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	assert.NotEmpty(suite.T(), chainID)
-    assert.NotEmpty(suite.T(), address)
-    _ = ctx
+	assert.NotEmpty(suite.T(), address)
+	_ = ctx
 }
 
 func (suite *WalletRepositoryTestSuite) TestWithTx_Success() {
@@ -440,7 +440,7 @@ func TestWalletRepositoryIntegration(t *testing.T) {
 
 	// These tests would require actual database connection
 	// You would set up a test database, run migrations, and test real operations
-	
+
 	t.Run("CreateAndRetrieveWallet", func(t *testing.T) {
 		// Test with real database connection
 		t.Skip("Requires test database setup")
@@ -476,7 +476,7 @@ func BenchmarkGetByAccountID(b *testing.B) {
 	defer db.Close()
 
 	rows := sqlmock.NewRows([]string{
-		"id", "user_id", "account_id", "address", "chain_id", "is_primary", 
+		"id", "user_id", "account_id", "address", "chain_id", "is_primary",
 		"verified_at", "created_at", "updated_at",
 	}).AddRow(
 		"wallet-123", "user-456", "account-789", "0x1234567890123456789012345678901234567890",
@@ -500,7 +500,7 @@ func BenchmarkInsertWallet(b *testing.B) {
 	defer db.Close()
 
 	rows := sqlmock.NewRows([]string{
-		"id", "user_id", "account_id", "address", "chain_id", "is_primary", 
+		"id", "user_id", "account_id", "address", "chain_id", "is_primary",
 		"verified_at", "created_at", "updated_at",
 	}).AddRow(
 		"wallet-123", "user-456", "account-789", "0x1234567890123456789012345678901234567890",
@@ -526,7 +526,7 @@ func BenchmarkInsertWallet(b *testing.B) {
 
 func BenchmarkHashString(b *testing.B) {
 	input := "test-account-123"
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		repository.HashString(input)
@@ -565,7 +565,7 @@ func TestDatabaseErrors(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mock.ExpectQuery(`SELECT (.+) FROM wallets`).WillReturnError(tc.mockError)
-			
+
 			// Test error handling
 			assert.Contains(t, "failed to get wallet", "database operation")
 		})
@@ -584,9 +584,9 @@ func TestConcurrentWalletOperations(t *testing.T) {
 
 // Test transaction edge cases
 func TestTransactionEdgeCases(t *testing.T) {
-    db, mock, _ := sqlmock.New()
-    defer db.Close()
-    _ = mock
+	db, mock, _ := sqlmock.New()
+	defer db.Close()
+	_ = mock
 
 	t.Run("NestedTransactions", func(t *testing.T) {
 		// Test nested transaction handling

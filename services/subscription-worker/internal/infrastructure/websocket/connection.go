@@ -72,7 +72,7 @@ func (c *Connection) Close() error {
 
 		close(c.send)
 		c.conn.Close()
-		
+
 		// Remove from manager
 		c.manager.RemoveConnection(c.id)
 	})
@@ -215,7 +215,7 @@ func (c *Connection) handleClientMessage(data []byte) error {
 		}
 		c.AddIntentID(clientMessage.IntentID)
 		c.manager.AddSubscription(clientMessage.IntentID, c.id)
-		
+
 		// Send subscription confirmation
 		response := domain.NewWebSocketMessage("subscribed", clientMessage.IntentID, map[string]string{
 			"status": "subscribed to intent",
@@ -228,7 +228,7 @@ func (c *Connection) handleClientMessage(data []byte) error {
 		}
 		c.RemoveIntentID(clientMessage.IntentID)
 		c.manager.RemoveSubscription(clientMessage.IntentID, c.id)
-		
+
 		// Send unsubscription confirmation
 		response := domain.NewWebSocketMessage("unsubscribed", clientMessage.IntentID, map[string]string{
 			"status": "unsubscribed from intent",

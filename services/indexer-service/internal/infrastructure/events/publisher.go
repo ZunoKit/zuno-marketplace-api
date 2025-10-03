@@ -13,7 +13,7 @@ import (
 const (
 	// Collection event routing keys
 	collectionEventPrefix = "collections.events.created"
-	
+
 	// Event schema versions
 	eventSchemaV1 = "marketplace.events.v1"
 )
@@ -57,12 +57,12 @@ func (p *EventPublisher) PublishCollectionEvent(ctx context.Context, chainID str
 
 	// Create message headers
 	headers := map[string]interface{}{
-		"event_type":    event.EventType,
-		"chain_id":      event.ChainID,
-		"schema":        event.Schema,
-		"version":       event.Version,
-		"published_at":  event.Timestamp.Unix(),
-		"content_type":  "application/json",
+		"event_type":   event.EventType,
+		"chain_id":     event.ChainID,
+		"schema":       event.Schema,
+		"version":      event.Version,
+		"published_at": event.Timestamp.Unix(),
+		"content_type": "application/json",
 	}
 
 	// Publish message
@@ -88,18 +88,18 @@ func (p *EventPublisher) PublishCollectionCreatedEvent(ctx context.Context, chai
 	// Create publishable event
 	eventData := map[string]interface{}{
 		"collection_address": collectionEvent.CollectionAddress,
-		"creator":           collectionEvent.Creator,
-		"name":              collectionEvent.Name,
-		"symbol":            collectionEvent.Symbol,
-		"collection_type":   collectionEvent.CollectionType,
-		"max_supply":        collectionEvent.MaxSupply.String(),
-		"royalty_recipient": collectionEvent.RoyaltyRecipient,
+		"creator":            collectionEvent.Creator,
+		"name":               collectionEvent.Name,
+		"symbol":             collectionEvent.Symbol,
+		"collection_type":    collectionEvent.CollectionType,
+		"max_supply":         collectionEvent.MaxSupply.String(),
+		"royalty_recipient":  collectionEvent.RoyaltyRecipient,
 		"royalty_percentage": collectionEvent.RoyaltyPercentage,
-		"block_number":      rawEvent.BlockNumber.String(),
-		"block_hash":        rawEvent.BlockHash,
-		"tx_hash":           rawEvent.TxHash,
-		"log_index":         rawEvent.LogIndex,
-		"confirmations":     rawEvent.Confirmations,
+		"block_number":       rawEvent.BlockNumber.String(),
+		"block_hash":         rawEvent.BlockHash,
+		"tx_hash":            rawEvent.TxHash,
+		"log_index":          rawEvent.LogIndex,
+		"confirmations":      rawEvent.Confirmations,
 	}
 
 	publishableEvent := &domain.PublishableEvent{
@@ -141,12 +141,12 @@ func (p *EventPublisher) PublishMintEvent(ctx context.Context, chainID string, e
 
 	// Create message headers
 	headers := map[string]interface{}{
-		"event_type":    event.EventType,
-		"chain_id":      event.ChainID,
-		"schema":        event.Schema,
-		"version":       event.Version,
-		"published_at":  event.Timestamp.Unix(),
-		"content_type":  "application/json",
+		"event_type":   event.EventType,
+		"chain_id":     event.ChainID,
+		"schema":       event.Schema,
+		"version":      event.Version,
+		"published_at": event.Timestamp.Unix(),
+		"content_type": "application/json",
 	}
 
 	// Publish message

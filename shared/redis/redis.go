@@ -22,7 +22,7 @@ type Redis struct {
 
 func NewRedis(cfg RedisConfig) (*Redis, error) {
 
-	url:=fmt.Sprintf("%s:%d", cfg.RedisHost, cfg.RedisPort)
+	url := fmt.Sprintf("%s:%d", cfg.RedisHost, cfg.RedisPort)
 	log.Println("===>Redis URL: ", url)
 	conn := redis.NewClient(&redis.Options{
 		Addr:     url,

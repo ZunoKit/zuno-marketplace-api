@@ -24,7 +24,6 @@ import (
 func main() {
 	// Load configuration
 
-	
 	cfg := config.LoadConfig()
 	fmt.Println("===>JWTKey", cfg.PinataConfig.JWTKey)
 	if err := cfg.Validate(); err != nil {
@@ -61,11 +60,8 @@ func main() {
 	// Initialize repository
 	mediaRepo := repository.NewMediaRepository(mongoClient)
 
-
 	// Initialize Pinata client
 	pinataClient := pinning.NewPinataClient(cfg.PinataConfig)
-
-
 
 	// Initialize service
 	mediaService := service.NewMediaService(

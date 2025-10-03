@@ -12,7 +12,7 @@ type WSMessage[T any] struct {
 	Version       int       `json:"version"`                 // schema version
 	CorrelationID string    `json:"correlationId,omitempty"` // intentId/requestId
 	TraceID       string    `json:"traceId,omitempty"`
-	EmittedAt     time.Time `json:"emittedAt"`               // server time (UTC)
+	EmittedAt     time.Time `json:"emittedAt"` // server time (UTC)
 	Data          T         `json:"data"`
 	Error         *WSError  `json:"error,omitempty"`
 }

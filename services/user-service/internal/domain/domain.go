@@ -56,8 +56,6 @@ type TxUserRepository interface {
 	TouchUserAccountTx(ctx context.Context, accountID, address string) error
 }
 
-
-
 // Validation helpers
 func ValidateAccountID(accountID AccountID) error {
 	if accountID == "" {

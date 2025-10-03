@@ -15,27 +15,27 @@ import (
 const (
 	// CollectionCreated event signature (keccak256 hash)
 	CollectionCreatedSignature = "0x4d72fe0577a3a3f7da968d7b892779dde102519c25c1838b6653ccc4b0b96d2e" // Placeholder
-	
+
 	// Batch processing settings
 	MaxBlockBatchSize = 100
-	MaxRetries       = 3
-	RetryDelay       = 5 * time.Second
+	MaxRetries        = 3
+	RetryDelay        = 5 * time.Second
 )
 
 type IndexerService struct {
-	eventRepo          domain.EventRepository
-	checkpointRepo     domain.CheckpointRepository
-	publisher          domain.EventPublisher
-	blockchainClients  map[string]*blockchain.Client
-	factoryContracts   map[string]string // chainID -> factory contract address
-	pollingInterval    time.Duration
-	
+	eventRepo         domain.EventRepository
+	checkpointRepo    domain.CheckpointRepository
+	publisher         domain.EventPublisher
+	blockchainClients map[string]*blockchain.Client
+	factoryContracts  map[string]string // chainID -> factory contract address
+	pollingInterval   time.Duration
+
 	// Control channels
-	stopChan   chan struct{}
-	errorChan  chan error
-	wg         sync.WaitGroup
-	mu         sync.RWMutex
-	isRunning  bool
+	stopChan  chan struct{}
+	errorChan chan error
+	wg        sync.WaitGroup
+	mu        sync.RWMutex
+	isRunning bool
 }
 
 // NewIndexerService creates a new indexer service
@@ -207,7 +207,7 @@ func (s *IndexerService) processChainEvents(ctx context.Context, chainID, factor
 	// Process blocks in batches to avoid overwhelming the system
 	batchSize := int64(MaxBlockBatchSize)
 	fromBlock := nextBlock
-	
+
 	for fromBlock.Cmp(latestBlock) <= 0 {
 		// Calculate batch end block
 		toBlock := new(big.Int).Add(fromBlock, big.NewInt(batchSize-1))

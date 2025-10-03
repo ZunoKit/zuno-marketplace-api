@@ -108,7 +108,7 @@ func (suite *WalletGRPCTestSuite) TestUpsertLink_Success_NewWallet() {
 	suite.Equal(walletLink.IsPrimary, resp.Link.IsPrimary)
 	suite.True(resp.Created)
 	suite.True(resp.PrimaryChanged)
-	
+
 	suite.mockService.AssertExpectations(suite.T())
 	// Note: Event publishing is async, so we might not assert it immediately
 }
@@ -152,13 +152,13 @@ func (suite *WalletGRPCTestSuite) TestUpsertLink_Success_ExistingWallet() {
 	suite.Equal(walletLink.ID, resp.Link.Id)
 	suite.False(resp.Created)
 	suite.False(resp.PrimaryChanged)
-	
+
 	suite.mockService.AssertExpectations(suite.T())
 }
 
 func (suite *WalletGRPCTestSuite) TestUpsertLink_InvalidRequest() {
 	ctx := context.Background()
-	
+
 	testCases := []struct {
 		name string
 		req  *walletpb.UpsertLinkRequest
@@ -209,10 +209,10 @@ func (suite *WalletGRPCTestSuite) TestUpsertLink_InvalidRequest() {
 	for _, tc := range testCases {
 		suite.T().Run(tc.name, func(t *testing.T) {
 			resp, err := suite.handler.UpsertLink(ctx, tc.req)
-			
+
 			assert.Error(t, err)
 			assert.Nil(t, resp)
-			
+
 			st, ok := status.FromError(err)
 			assert.True(t, ok)
 			assert.Equal(t, codes.InvalidArgument, st.Code())
@@ -237,7 +237,7 @@ func (suite *WalletGRPCTestSuite) TestUpsertLink_ServiceError() {
 
 	suite.Error(err)
 	suite.Nil(resp)
-	
+
 	st, ok := status.FromError(err)
 	suite.True(ok)
 	suite.Equal(codes.Internal, st.Code())
@@ -261,7 +261,7 @@ func (suite *WalletGRPCTestSuite) TestUpsertLink_UnauthorizedAccess() {
 
 	suite.Error(err)
 	suite.Nil(resp)
-	
+
 	st, ok := status.FromError(err)
 	suite.True(ok)
 	suite.Equal(codes.Internal, st.Code())
@@ -313,7 +313,7 @@ func (suite *WalletGRPCTestSuite) TestUpsertLink_EventPublishingFailure() {
 	suite.Equal(walletLink.ID, resp.Link.Id)
 	suite.True(resp.Created)
 	suite.True(resp.PrimaryChanged)
-	
+
 	suite.mockService.AssertExpectations(suite.T())
 }
 
@@ -332,7 +332,7 @@ func TestGRPCValidation(t *testing.T) {
 		resp, err := handler.UpsertLink(ctx, nil)
 		assert.Error(t, err)
 		assert.Nil(t, resp)
-		
+
 		st, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, st.Code())
@@ -380,7 +380,7 @@ func TestGRPCValidation(t *testing.T) {
 func TestDomainToProtoConversion(t *testing.T) {
 	now := time.Now()
 	verifiedAt := now.Add(-1 * time.Hour)
-	
+
 	domainLink := &domain.WalletLink{
 		ID:         "wallet-123",
 		UserID:     "user-456",
@@ -443,7 +443,7 @@ func BenchmarkUpsertLink(b *testing.B) {
 	mockPublisher := new(MockEventPublisher)
 	handler := grpcHandler.NewWalletGRPCServer(mockService, mockPublisher)
 	ctx := context.Background()
-	
+
 	req := &walletpb.UpsertLinkRequest{
 		UserId:    "user-123",
 		AccountId: "account-456",
@@ -524,7 +524,7 @@ func TestUpsertLink_ConcurrentRequests(t *testing.T) {
 	for i := 0; i < concurrency; i++ {
 		go func() {
 			defer func() { done <- true }()
-			
+
 			resp, err := handler.UpsertLink(ctx, req)
 			assert.NoError(t, err)
 			assert.NotNil(t, resp)
@@ -541,10 +541,10 @@ func TestUpsertLink_ConcurrentRequests(t *testing.T) {
 // Error mapping tests
 func TestErrorMapping(t *testing.T) {
 	testCases := []struct {
-		name           string
-		serviceError   error
-		expectedCode   codes.Code
-		expectedMsg    string
+		name         string
+		serviceError error
+		expectedCode codes.Code
+		expectedMsg  string
 	}{
 		{
 			name:         "wallet_not_found",
@@ -597,10 +597,10 @@ func TestErrorMapping(t *testing.T) {
 				Return((*domain.WalletUpsertResult)(nil), tc.serviceError)
 
 			resp, err := handler.UpsertLink(ctx, req)
-			
+
 			assert.Error(t, err)
 			assert.Nil(t, resp)
-			
+
 			st, ok := status.FromError(err)
 			assert.True(t, ok)
 			assert.Equal(t, tc.expectedCode, st.Code())
