@@ -1,0 +1,77 @@
+enum MediaKind {
+  IMAGE
+  VIDEO
+  AUDIO
+  OTHER
+}
+enum VariantFormat {
+  JPG
+  WEBP
+  PNG
+  MP4
+  GIF
+}
+enum PinStatus {
+  PENDING
+  PINNING
+  PINNED
+  FAILED
+}
+
+type MediaVariant {
+  id: ID!
+  cdnUrl: URL!
+  width: Int!
+  height: Int!
+  format: VariantFormat!
+}
+
+type MediaUrls {
+  gateway: URL
+  cdn: URL
+}
+
+type MediaAsset {
+  id: ID!
+  kind: MediaKind!
+  mime: String!
+  bytes: BigInt
+  width: Int
+  height: Int
+  sha256: String!
+  pinStatus: PinStatus!
+  ipfsCid: CID
+  createdAt: DateTime!
+  refCount: Int!
+  variants: [MediaVariant!]!
+  url: MediaUrls
+}
+
+input UploadSingleFileInput {
+  file: Upload!
+  kind: MediaKind!
+}
+
+type UploadSingleFilePayload {
+  asset: MediaAsset!
+  deduplicated: Boolean!
+  url: MediaUrls
+  cid: CID
+}
+
+type MediaPinStatusEvent {
+  assetId: ID!
+  status: PinStatus!
+  cid: CID
+  gateway: URL
+  updatedAt: DateTime!
+}
+
+extend type Query {
+  mediaAsset(id: ID!): MediaAsset
+  mediaAssetByCid(cid: CID!): MediaAsset
+}
+
+extend type Mutation {
+  uploadSingleFile(input: UploadSingleFileInput!): UploadSingleFilePayload!
+}
