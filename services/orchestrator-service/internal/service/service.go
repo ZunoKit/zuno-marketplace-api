@@ -22,22 +22,44 @@ type Service struct {
 	sessionValidationTimeout time.Duration
 }
 
+// NewOrchestrator preserves the original 5-arg constructor used in tests
 func NewOrchestrator(
-	repo domain.OrchestratorRepo,
-	encoder domain.Encoder,
-	statusCache domain.StatusCache,
-	chainRegistry protoChainRegistry.ChainRegistryServiceClient,
-	sessionLinkedIntents bool,
-	sessionValidationTimeout time.Duration,
+    repo domain.OrchestratorRepo,
+    encoder domain.Encoder,
+    statusCache domain.StatusCache,
+    chainRegistry protoChainRegistry.ChainRegistryServiceClient,
+    sessionLinkedIntents bool,
 ) domain.OrchestratorService {
-	return &Service{
-		repo:                     repo,
-		encoder:                  encoder,
-		statusCache:              statusCache,
-		chainRegistry:            chainRegistry,
-		sessionLinkedIntents:     sessionLinkedIntents,
-		sessionValidationTimeout: sessionValidationTimeout,
-	}
+    return NewOrchestratorWithTimeout(
+        repo,
+        encoder,
+        statusCache,
+        chainRegistry,
+        sessionLinkedIntents,
+        2*time.Second,
+    )
+}
+
+// NewOrchestratorWithTimeout allows specifying the session validation timeout
+func NewOrchestratorWithTimeout(
+    repo domain.OrchestratorRepo,
+    encoder domain.Encoder,
+    statusCache domain.StatusCache,
+    chainRegistry protoChainRegistry.ChainRegistryServiceClient,
+    sessionLinkedIntents bool,
+    sessionValidationTimeout time.Duration,
+) domain.OrchestratorService {
+    if sessionValidationTimeout == 0 {
+        sessionValidationTimeout = 2 * time.Second
+    }
+    return &Service{
+        repo:                     repo,
+        encoder:                  encoder,
+        statusCache:              statusCache,
+        chainRegistry:            chainRegistry,
+        sessionLinkedIntents:     sessionLinkedIntents,
+        sessionValidationTimeout: sessionValidationTimeout,
+    }
 }
 
 func (s *Service) getFactoryAddressAndType(ctx context.Context, chainID domain.ChainID, in domain.PrepareCreateCollectionInput) (domain.Address, domain.Standard, error) {

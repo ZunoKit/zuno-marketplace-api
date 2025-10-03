@@ -66,3 +66,9 @@ func buildDSN(cfg PostgresConfig) string {
 func (p *Postgres) GetClient() *sql.DB {
 	return p.conn
 }
+
+// NewPostgresWithDB creates a Postgres instance with an existing database connection
+// This is useful for testing with sqlmock
+func NewPostgresWithDB(db *sql.DB) *Postgres {
+	return &Postgres{conn: db}
+}

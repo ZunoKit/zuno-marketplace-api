@@ -38,7 +38,7 @@ func (s *WalletGRPCServer) UpsertLink(ctx context.Context, req *wallet.UpsertLin
 	// Call service layer
 	result, err := s.service.UpsertLink(ctx, domainLink)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "internal server error: %v", err)
+		return nil, mapDomainErrorToGRPC(err)
 	}
 
 	// Publish event if wallet was linked (created or primary changed)
@@ -136,4 +136,22 @@ func (s *WalletGRPCServer) DomainLinkToProto(link *domain.WalletLink) *wallet.Wa
 
 func (s *WalletGRPCServer) RequestToDomain(req *wallet.UpsertLinkRequest) domain.WalletLink {
 	return s.requestToDomain(req)
+}
+
+// mapDomainErrorToGRPC maps domain errors to appropriate gRPC status codes
+func mapDomainErrorToGRPC(err error) error {
+	switch err {
+	case domain.ErrWalletNotFound:
+		return status.Error(codes.NotFound, err.Error())
+	case domain.ErrUnauthorizedAccess:
+		return status.Error(codes.PermissionDenied, err.Error())
+	case domain.ErrInvalidAddress, domain.ErrInvalidChainID:
+		return status.Error(codes.InvalidArgument, err.Error())
+	case domain.ErrWalletAlreadyExists:
+		return status.Error(codes.AlreadyExists, err.Error())
+	case domain.ErrCannotRemovePrimary:
+		return status.Error(codes.FailedPrecondition, err.Error())
+	default:
+		return status.Errorf(codes.Internal, "internal server error: %v", err)
+	}
 }

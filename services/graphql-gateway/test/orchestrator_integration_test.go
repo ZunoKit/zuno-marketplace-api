@@ -85,6 +85,7 @@ func (suite *OrchestratorIntegrationTestSuite) TestAuthenticationRequirement() {
 		ChainID: "1",
 		Name:    "Test Collection",
 		Symbol:  "TEST",
+		Type:    "ERC721",
 	}
 
 	result, err := mutationResolver.PrepareCreateCollection(ctx, input)
@@ -102,6 +103,7 @@ func (suite *OrchestratorIntegrationTestSuite) TestServiceUnavailable() {
 		ChainID: "1",
 		Name:    "Test Collection",
 		Symbol:  "TEST",
+		Type:    "ERC721",
 	}
 
 	result, err := mutationResolver.PrepareCreateCollection(ctx, input)

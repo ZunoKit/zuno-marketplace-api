@@ -120,14 +120,14 @@ func (suite *WalletServiceTestSuite) TestUpsertLink_NewWallet() {
 		Run(func(args mock.Arguments) {
 			fn := args.Get(1).(func(domain.TxWalletRepository) error)
 
-			// Mock transaction operations for new wallet scenario
-			mockTxRepo.On("AcquireAccountLock", ctx, link.AccountID).Return(nil)
-			mockTxRepo.On("AcquireAddressLock", ctx, link.ChainID, link.Address).Return(nil)
-			mockTxRepo.On("GetByAddressTx", ctx, link.ChainID, link.Address).Return((*domain.WalletLink)(nil), domain.ErrWalletNotFound)
-			mockTxRepo.On("GetByAccountIDTx", ctx, link.AccountID).Return((*domain.WalletLink)(nil), domain.ErrWalletNotFound)
-			mockTxRepo.On("GetPrimaryByUserChainTx", ctx, link.UserID, link.ChainID).Return((*domain.WalletLink)(nil), domain.ErrWalletNotFound)
-			mockTxRepo.On("DemoteOtherPrimariesTx", ctx, link.UserID, link.ChainID, "").Return(nil)
-			mockTxRepo.On("InsertWalletTx", ctx, mock.AnythingOfType("domain.WalletLink")).Return(insertedLink, nil)
+		// Mock transaction operations for new wallet scenario
+		mockTxRepo.On("AcquireAccountLock", ctx, link.AccountID).Return(nil)
+		mockTxRepo.On("AcquireAddressLock", ctx, link.ChainID, link.Address).Return(nil)
+		mockTxRepo.On("GetByAddressTx", ctx, link.ChainID, link.Address).Return((*domain.WalletLink)(nil), domain.ErrWalletNotFound)
+		mockTxRepo.On("GetByAccountIDTx", ctx, link.AccountID).Return((*domain.WalletLink)(nil), domain.ErrWalletNotFound)
+		// GetPrimaryByUserChainTx is NOT called when IsPrimary is true - it goes directly to DemoteOtherPrimariesTx
+		mockTxRepo.On("DemoteOtherPrimariesTx", ctx, link.UserID, link.ChainID, "").Return(nil)
+		mockTxRepo.On("InsertWalletTx", ctx, mock.AnythingOfType("domain.WalletLink")).Return(insertedLink, nil)
 
 			fn(mockTxRepo)
 		}).Return(nil)
@@ -267,11 +267,23 @@ func (suite *WalletServiceTestSuite) TestUpsertLink_UnauthorizedAccess() {
 	}
 
 	// Existing wallet belongs to different user
-	existingWallet := &domain.WalletLink{
+	// Create two different wallet records to trigger unauthorized access check
+	existingWalletByAddress := &domain.WalletLink{
 		ID:        "wallet-789",
 		UserID:    "different-user-999", // Different user!
-		AccountID: link.AccountID,
+		AccountID: "other-account",
 		Address:   link.Address,
+		ChainID:   link.ChainID,
+		IsPrimary: false,
+		CreatedAt: time.Now().Add(-1 * time.Hour),
+		UpdatedAt: time.Now().Add(-1 * time.Hour),
+	}
+
+	existingWalletByAccount := &domain.WalletLink{
+		ID:        "wallet-456",
+		UserID:    "another-user-888", // Also different user!
+		AccountID: link.AccountID,
+		Address:   "0xDifferentAddress000000000000000000000000",
 		ChainID:   link.ChainID,
 		IsPrimary: false,
 		CreatedAt: time.Now().Add(-1 * time.Hour),
@@ -286,10 +298,11 @@ func (suite *WalletServiceTestSuite) TestUpsertLink_UnauthorizedAccess() {
 			fn := args.Get(1).(func(domain.TxWalletRepository) error)
 
 			// Mock transaction operations that will detect unauthorized access
+			// Different wallet IDs will trigger the unauthorized access check
 			mockTxRepo.On("AcquireAccountLock", ctx, link.AccountID).Return(nil)
 			mockTxRepo.On("AcquireAddressLock", ctx, link.ChainID, link.Address).Return(nil)
-			mockTxRepo.On("GetByAddressTx", ctx, link.ChainID, link.Address).Return(existingWallet, nil)
-			mockTxRepo.On("GetByAccountIDTx", ctx, link.AccountID).Return(existingWallet, nil)
+			mockTxRepo.On("GetByAddressTx", ctx, link.ChainID, link.Address).Return(existingWalletByAddress, nil)
+			mockTxRepo.On("GetByAccountIDTx", ctx, link.AccountID).Return(existingWalletByAccount, nil)
 
 			fn(mockTxRepo)
 		}).Return(domain.ErrUnauthorizedAccess)

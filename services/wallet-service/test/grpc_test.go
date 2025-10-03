@@ -240,7 +240,7 @@ func (suite *WalletGRPCTestSuite) TestUpsertLink_ServiceError() {
 
 	st, ok := status.FromError(err)
 	suite.True(ok)
-	suite.Equal(codes.Internal, st.Code())
+	suite.Equal(codes.InvalidArgument, st.Code())
 	suite.mockService.AssertExpectations(suite.T())
 }
 
@@ -264,7 +264,7 @@ func (suite *WalletGRPCTestSuite) TestUpsertLink_UnauthorizedAccess() {
 
 	st, ok := status.FromError(err)
 	suite.True(ok)
-	suite.Equal(codes.Internal, st.Code())
+	suite.Equal(codes.PermissionDenied, st.Code())
 	suite.Contains(st.Message(), "unauthorized_access")
 	suite.mockService.AssertExpectations(suite.T())
 }

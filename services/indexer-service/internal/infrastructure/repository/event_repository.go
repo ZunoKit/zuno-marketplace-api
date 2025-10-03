@@ -163,8 +163,8 @@ func (r *EventRepository) StoreRawEvent(ctx context.Context, event *domain.RawEv
 		"$setOnInsert": eventDoc,
 	}
 
-	opts := options.Update().SetUpsert(true)
-	result, err := r.collection.UpdateOne(ctx, filter, update, opts)
+    updOpts := options.UpdateOne().SetUpsert(true)
+    result, err := r.collection.UpdateOne(ctx, filter, update, updOpts)
 	if err != nil {
 		return fmt.Errorf("failed to store event: %w", err)
 	}
@@ -240,11 +240,13 @@ func (r *EventRepository) GetEventsByContract(ctx context.Context, chainID, cont
 		"contract_address": contractAddress,
 	}
 
-    opts := options.Find().
-		SetSort(bson.M{"created_at": -1}).
-		SetLimit(limit)
+    // Build find options using v2 API (builder pattern)
+    findOpts := options.Find().SetSort(bson.M{"created_at": -1})
+    if limit > 0 {
+        findOpts = findOpts.SetLimit(limit)
+    }
 
-	cursor, err := r.collection.Find(ctx, filter, opts)
+    cursor, err := r.collection.Find(ctx, filter, findOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find events for contract: %w", err)
 	}
@@ -268,6 +270,12 @@ func (r *EventRepository) GetEventsByContract(ctx context.Context, chainID, cont
 	return events, nil
 }
 
+// EventToDocument converts a domain event to a MongoDB document
+// Exported for testing purposes
+func (r *EventRepository) EventToDocument(event *domain.RawEvent) bson.M {
+	return r.eventToDocument(event)
+}
+
 // eventToDocument converts a domain event to a MongoDB document
 func (r *EventRepository) eventToDocument(event *domain.RawEvent) bson.M {
 	doc := bson.M{
@@ -288,6 +296,12 @@ func (r *EventRepository) eventToDocument(event *domain.RawEvent) bson.M {
 	}
 
 	return doc
+}
+
+// DocumentToEvent converts a MongoDB document to a domain event
+// Exported for testing purposes
+func (r *EventRepository) DocumentToEvent(doc bson.M) (*domain.RawEvent, error) {
+	return r.documentToEvent(doc)
 }
 
 // documentToEvent converts a MongoDB document to a domain event
@@ -362,6 +376,12 @@ func (r *EventRepository) documentToEvent(doc bson.M) (*domain.RawEvent, error) 
 	}
 
 	return event, nil
+}
+
+// GenerateEventID creates a unique ID for an event
+// Exported for testing purposes
+func GenerateEventID(chainID, txHash string, logIndex int) string {
+	return generateEventID(chainID, txHash, logIndex)
 }
 
 // generateEventID creates a unique ID for an event

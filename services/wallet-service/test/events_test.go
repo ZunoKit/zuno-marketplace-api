@@ -315,10 +315,12 @@ func BenchmarkEventSerialization(b *testing.B) {
 // Test event ID generation
 func TestGenerateEventID(t *testing.T) {
 	id1 := events.GenerateEventID()
+	time.Sleep(1 * time.Microsecond) // Ensure different timestamp
 	id2 := events.GenerateEventID()
 
 	assert.NotEmpty(t, id1)
 	assert.NotEmpty(t, id2)
-	assert.NotEqual(t, id1, id2)
+	assert.NotEqual(t, id1, id2, "Generated IDs should be unique")
 	assert.Contains(t, id1, "wallet_")
+	assert.Contains(t, id2, "wallet_")
 }

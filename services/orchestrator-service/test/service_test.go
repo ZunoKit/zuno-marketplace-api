@@ -7,7 +7,6 @@ import (
 
 	"github.com/quangdang46/NFT-Marketplace/services/orchestrator-service/internal/domain"
 	"github.com/quangdang46/NFT-Marketplace/services/orchestrator-service/internal/service"
-	chainpb "github.com/quangdang46/NFT-Marketplace/shared/proto/chainregistry"
 	protoChainRegistry "github.com/quangdang46/NFT-Marketplace/shared/proto/chainregistry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -48,6 +47,11 @@ func (m *MockRepo) FindByChainTx(ctx context.Context, chainID domain.ChainID, tx
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*domain.Intent), args.Error(1)
+}
+
+func (m *MockRepo) InsertSessionIntentAudit(ctx context.Context, sessionID string, intentID string, createdBy *string, fields any) error {
+    args := m.Called(ctx, sessionID, intentID, createdBy, fields)
+    return args.Error(0)
 }
 
 // Mock status cache for testing
@@ -141,11 +145,12 @@ func TestPrepareCreateCollection(t *testing.T) {
 		Symbol:   "TEST",
 		Creator:  "0x1234567890123456789012345678901234567890",
 		TokenURI: "ipfs://test",
+		Type:     domain.StdERC721,
 	}
 
 	// Mock chain-registry response
 	factoryContract := &protoChainRegistry.Contract{
-		Name:    "CollectionFactory",
+		Name:    "ERC721CollectionFactory",
 		Address: "0x1234567890123456789012345678901234567890",
 	}
 	chainRegistryResp := &protoChainRegistry.GetContractsResponse{
@@ -232,7 +237,7 @@ func TestTrackTx(t *testing.T) {
 	mockRepo.On("GetByID", ctx, "test-intent-id").Return(existingIntent, nil)
 	mockRepo.On("FindByChainTx", ctx, "eip155:8453", input.TxHash).Return(nil, domain.ErrNotFound)
 	mockRepo.On("UpdateTxHash", ctx, "test-intent-id", input.TxHash, (*domain.Address)(nil)).Return(nil)
-	mockRepo.On("UpdateStatus", ctx, "test-intent-id", domain.IntentReady, (*string)(nil)).Return(nil)
+	mockRepo.On("UpdateStatus", ctx, "test-intent-id", domain.IntentPending, (*string)(nil)).Return(nil)
 	mockStatusCache.On("SetIntentStatus", ctx, mock.AnythingOfType("domain.IntentStatusPayload"), domain.DefaultIntentTTL).Return(nil)
 
 	// Act
@@ -274,17 +279,9 @@ func TestPrepareCreateCollectionWithType(t *testing.T) {
 		},
 	}, nil)
 
-	// Mock ABI response
-	mockChainRegistry.On("GetAbiByAddress", ctx, &chainpb.GetAbiByAddressRequest{
-		ChainId: "eip155:1",
-		Address: "0xabcdef1234567890abcdef1234567890abcdef12",
-	}).Return(&protoChainRegistry.GetAbiBlobResponse{
-		AbiJson: `{"abi":[{"type":"function","name":"createERC721Collection","inputs":[{"name":"params","type":"tuple","components":[{"name":"name","type":"string"},{"name":"symbol","type":"string"},{"name":"owner","type":"address"},{"name":"description","type":"string"},{"name":"mintPrice","type":"uint256"},{"name":"royaltyFee","type":"uint256"},{"name":"maxSupply","type":"uint256"},{"name":"mintLimitPerWallet","type":"uint256"},{"name":"mintStartTime","type":"uint256"},{"name":"allowlistMintPrice","type":"uint256"},{"name":"publicMintPrice","type":"uint256"},{"name":"allowlistStageDuration","type":"uint256"},{"name":"tokenURI","type":"string"}]}],"outputs":[{"name":"","type":"address"}],"stateMutability":"nonpayable"}]}`,
-	}, nil)
-
 	// Mock repository calls
 	mockRepo.On("Create", ctx, mock.AnythingOfType("*domain.Intent")).Return(nil)
-	mockRepo.On("UpdateTxHash", ctx, mock.AnythingOfType("string"), "", mock.AnythingOfType("*domain.Address")).Return(nil)
+	mockRepo.On("UpdateTxHash", ctx, mock.AnythingOfType("string"), "", mock.AnythingOfType("*string")).Return(nil)
 	mockStatusCache.On("SetIntentStatus", ctx, mock.AnythingOfType("domain.IntentStatusPayload"), mock.AnythingOfType("time.Duration")).Return(nil)
 
 	result, err := svc.PrepareCreateCollection(ctx, input)
@@ -327,17 +324,9 @@ func TestPrepareCreateCollectionWithERC1155Type(t *testing.T) {
 		},
 	}, nil)
 
-	// Mock ABI response
-	mockChainRegistry.On("GetAbiByAddress", ctx, &chainpb.GetAbiByAddressRequest{
-		ChainId: "eip155:1",
-		Address: "0xabcdef1234567890abcdef1234567890abcdef12",
-	}).Return(&protoChainRegistry.GetAbiBlobResponse{
-		AbiJson: `{"abi":[{"type":"function","name":"createERC1155Collection","inputs":[{"name":"params","type":"tuple","components":[{"name":"name","type":"string"},{"name":"symbol","type":"string"},{"name":"owner","type":"address"},{"name":"description","type":"string"},{"name":"mintPrice","type":"uint256"},{"name":"royaltyFee","type":"uint256"},{"name":"maxSupply","type":"uint256"},{"name":"mintLimitPerWallet","type":"uint256"},{"name":"mintStartTime","type":"uint256"},{"name":"allowlistMintPrice","type":"uint256"},{"name":"publicMintPrice","type":"uint256"},{"name":"allowlistStageDuration","type":"uint256"},{"name":"tokenURI","type":"string"}]}],"outputs":[{"name":"","type":"address"}],"stateMutability":"nonpayable"}]}`,
-	}, nil)
-
 	// Mock repository calls
 	mockRepo.On("Create", ctx, mock.AnythingOfType("*domain.Intent")).Return(nil)
-	mockRepo.On("UpdateTxHash", ctx, mock.AnythingOfType("string"), "", mock.AnythingOfType("*domain.Address")).Return(nil)
+	mockRepo.On("UpdateTxHash", ctx, mock.AnythingOfType("string"), "", mock.AnythingOfType("*string")).Return(nil)
 	mockStatusCache.On("SetIntentStatus", ctx, mock.AnythingOfType("domain.IntentStatusPayload"), mock.AnythingOfType("time.Duration")).Return(nil)
 
 	result, err := svc.PrepareCreateCollection(ctx, input)

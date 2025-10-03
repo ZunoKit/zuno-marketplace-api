@@ -56,7 +56,13 @@ func (m *MockRepository) GetContractMeta(ctx context.Context, chainID domain.Cha
 
 func (m *MockRepository) GetAbiBlob(ctx context.Context, sha domain.Sha256) (abiJSON []byte, etag string, err error) {
 	args := m.Called(ctx, sha)
-	return args.Get(0).([]byte), args.String(1), args.Error(2)
+    var blob []byte
+    if v := args.Get(0); v != nil {
+        if b, ok := v.([]byte); ok {
+            blob = b
+        }
+    }
+    return blob, args.String(1), args.Error(2)
 }
 
 func (m *MockRepository) ResolveProxy(ctx context.Context, chainID domain.ChainID, address domain.Address) (implAddress domain.Address, abiSha256 domain.Sha256, err error) {

@@ -30,7 +30,10 @@ func NewWalletRepository(pg *postgres.Postgres, rds *redis.Redis) domain.WalletR
 }
 
 func (r *Repository) WithTx(ctx context.Context, fn func(domain.TxWalletRepository) error) error {
-	tx, err := r.postgres.GetClient().BeginTx(ctx, nil)
+    if r.postgres == nil || r.postgres.GetClient() == nil {
+        return fmt.Errorf("database operation unavailable: postgres client is nil")
+    }
+    tx, err := r.postgres.GetClient().BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
