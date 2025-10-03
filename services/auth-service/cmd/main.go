@@ -83,7 +83,7 @@ func main() {
 		publisher,
 		[]byte(cfg.JWTKey),
 		[]byte(cfg.RefreshKey),
-		cfg.Features.EnhancedAuthSessions,
+		cfg.Features.EnableCollectionContext,
 	)
 
 	server := grpc.NewServer()

@@ -28,8 +28,8 @@ func (r *SubscriptionResolver) OnIntentStatus(ctx context.Context, intentID stri
 	// Try real-time WebSocket subscription first
 	if r.server.websocketClient != nil && r.server.websocketClient.IsConnected() {
 		log.Printf("Using real-time WebSocket subscription for intent: %s", intentID)
-		enhancedResolver := NewEnhancedSubscriptionResolver(r.server)
-		return enhancedResolver.OnIntentStatus(ctx, intentID)
+		websocketResolver := NewWebSocketSubscriptionResolver(r.server)
+		return websocketResolver.OnIntentStatus(ctx, intentID)
 	}
 
 	// Fallback to polling if WebSocket is not available

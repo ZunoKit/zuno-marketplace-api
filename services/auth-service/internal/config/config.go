@@ -86,12 +86,12 @@ func loadRabbitMQConfig() messaging.RabbitMQConfig {
 
 // Features holds feature flags for gradual rollout
 type Features struct {
-	EnhancedAuthSessions bool
+	EnableCollectionContext bool
 }
 
 func loadFeatures() Features {
 	return Features{
-		EnhancedAuthSessions: env.GetBool("ENHANCED_AUTH_SESSIONS", false),
+		EnableCollectionContext: env.GetBool("ENABLE_COLLECTION_CONTEXT", false),
 	}
 }
 

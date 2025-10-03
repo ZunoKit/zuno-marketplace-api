@@ -211,7 +211,7 @@ func isValidChainID(chainID string) bool {
 		return false
 	}
 
-	// Basic validation - can be enhanced based on requirements
+	// Basic validation - can be extended based on requirements
 	return len(namespace) > 0 && len(reference) > 0
 }
 
