@@ -55,14 +55,14 @@ func main() {
 	statusCache := status.NewStatusCache()
 	statusCache.(*status.StatusCache).SetRedis(r)
 
-    svc := service.NewOrchestratorWithTimeout(
-        repo,
-        encoder,
-        statusCache,
-        chainRegistryClient,
-        cfg.Features.SessionLinkedIntents,
-        time.Duration(cfg.Features.SessionValidationTimeoutMs)*time.Millisecond,
-    )
+	svc := service.NewOrchestratorWithTimeout(
+		repo,
+		encoder,
+		statusCache,
+		chainRegistryClient,
+		cfg.Features.SessionLinkedIntents,
+		time.Duration(cfg.Features.SessionValidationTimeoutMs)*time.Millisecond,
+	)
 
 	lis, err := net.Listen("tcp", cfg.GRPCPort)
 	if err != nil {

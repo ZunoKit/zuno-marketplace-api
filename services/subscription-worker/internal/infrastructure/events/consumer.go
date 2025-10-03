@@ -370,9 +370,9 @@ func (c *EventConsumer) GetConsumerInfo() map[string]interface{} {
 		"is_running":     c.isRunning,
 	}
 
-    if c.channel != nil {
-        info["channel_open"] = true
-    } else {
+	if c.channel != nil {
+		info["channel_open"] = true
+	} else {
 		info["channel_open"] = false
 	}
 

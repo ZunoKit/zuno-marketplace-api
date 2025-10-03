@@ -1,16 +1,16 @@
 package repository
 
 import (
-    "context"
-    "encoding/json"
-    "fmt"
-    "strings"
-    "time"
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+	"time"
 
-    "github.com/redis/go-redis/v9"
+	"github.com/redis/go-redis/v9"
 
-    "github.com/quangdang46/NFT-Marketplace/services/subscription-worker/internal/domain"
-    sharedRedis "github.com/quangdang46/NFT-Marketplace/shared/redis"
+	"github.com/quangdang46/NFT-Marketplace/services/subscription-worker/internal/domain"
+	sharedRedis "github.com/quangdang46/NFT-Marketplace/shared/redis"
 )
 
 const (
@@ -39,7 +39,7 @@ func NewIntentRepository(client *sharedRedis.Redis) *IntentRepository {
 func (r *IntentRepository) GetIntentStatus(ctx context.Context, intentID string) (*domain.IntentStatus, error) {
 	key := intentStatusKeyPrefix + intentID
 
-    data, err := r.redis.Get(ctx, key)
+	data, err := r.redis.Get(ctx, key)
 	if err != nil {
 		if err == redis.Nil {
 			return nil, fmt.Errorf("intent not found: %s", intentID)
@@ -79,7 +79,7 @@ func (r *IntentRepository) UpdateIntentStatus(ctx context.Context, status *domai
 		}
 	}
 
-    err = r.redis.Set(ctx, key, string(data), ttl)
+	err = r.redis.Set(ctx, key, string(data), ttl)
 	if err != nil {
 		return fmt.Errorf("failed to set intent status: %w", err)
 	}
@@ -104,7 +104,7 @@ func (r *IntentRepository) UpdateIntentStatus(ctx context.Context, status *domai
 
 	// Add to expired set if the intent has expired
 	if !status.ExpiresAt.IsZero() && time.Now().After(status.ExpiresAt) {
-        err = r.redis.SAdd(ctx, expiredIntentsKey, status.IntentID)
+		err = r.redis.SAdd(ctx, expiredIntentsKey, status.IntentID)
 		if err != nil {
 			fmt.Printf("Warning: failed to add to expired set: %v\n", err)
 		}
@@ -118,7 +118,7 @@ func (r *IntentRepository) GetPendingIntentsByContract(ctx context.Context, chai
 	key := r.getContractKey(chainID, contractAddress)
 
 	// Get all intent IDs for this contract
-    intentIDs, err := r.redis.SMembers(ctx, key)
+	intentIDs, err := r.redis.SMembers(ctx, key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get contract intents: %w", err)
 	}
@@ -145,7 +145,7 @@ func (r *IntentRepository) GetIntentsByTxHash(ctx context.Context, chainID, txHa
 	key := r.getTxHashKey(chainID, txHash)
 
 	// Get all intent IDs for this transaction hash
-    intentIDs, err := r.redis.SMembers(ctx, key)
+	intentIDs, err := r.redis.SMembers(ctx, key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tx hash intents: %w", err)
 	}
@@ -174,7 +174,7 @@ func (r *IntentRepository) DeleteIntent(ctx context.Context, intentID string) er
 
 	// Delete main intent key
 	key := intentStatusKeyPrefix + intentID
-    err = r.redis.Delete(ctx, key)
+	err = r.redis.Delete(ctx, key)
 	if err != nil {
 		return fmt.Errorf("failed to delete intent: %w", err)
 	}
@@ -182,16 +182,16 @@ func (r *IntentRepository) DeleteIntent(ctx context.Context, intentID string) er
 	// Clean up indexes
 	if status.ContractAddress != "" && status.ChainID != "" {
 		contractKey := r.getContractKey(status.ChainID, status.ContractAddress)
-        _ = r.redis.SRem(ctx, contractKey, intentID)
+		_ = r.redis.SRem(ctx, contractKey, intentID)
 	}
 
 	if status.TxHash != "" && status.ChainID != "" {
 		txHashKey := r.getTxHashKey(status.ChainID, status.TxHash)
-        _ = r.redis.SRem(ctx, txHashKey, intentID)
+		_ = r.redis.SRem(ctx, txHashKey, intentID)
 	}
 
 	// Remove from expired set
-    _ = r.redis.SRem(ctx, expiredIntentsKey, intentID)
+	_ = r.redis.SRem(ctx, expiredIntentsKey, intentID)
 
 	return nil
 }
@@ -199,7 +199,7 @@ func (r *IntentRepository) DeleteIntent(ctx context.Context, intentID string) er
 // GetExpiredIntents gets all expired intents for cleanup
 func (r *IntentRepository) GetExpiredIntents(ctx context.Context) ([]*domain.IntentStatus, error) {
 	// Get expired intent IDs from the set
-    expiredIDs, err := r.redis.SMembers(ctx, expiredIntentsKey)
+	expiredIDs, err := r.redis.SMembers(ctx, expiredIntentsKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get expired intent IDs: %w", err)
 	}
@@ -209,7 +209,7 @@ func (r *IntentRepository) GetExpiredIntents(ctx context.Context) ([]*domain.Int
 		status, err := r.GetIntentStatus(ctx, intentID)
 		if err != nil {
 			// Intent might have been cleaned up already, remove from set
-            _ = r.redis.SRem(ctx, expiredIntentsKey, intentID)
+			_ = r.redis.SRem(ctx, expiredIntentsKey, intentID)
 			continue
 		}
 
@@ -218,7 +218,7 @@ func (r *IntentRepository) GetExpiredIntents(ctx context.Context) ([]*domain.Int
 			expiredIntents = append(expiredIntents, status)
 		} else {
 			// Remove from expired set if not actually expired
-            _ = r.redis.SRem(ctx, expiredIntentsKey, intentID)
+			_ = r.redis.SRem(ctx, expiredIntentsKey, intentID)
 		}
 	}
 
@@ -234,12 +234,12 @@ func (r *IntentRepository) HealthCheck(ctx context.Context) error {
 
 func (r *IntentRepository) addToContractIndex(ctx context.Context, status *domain.IntentStatus) error {
 	key := r.getContractKey(status.ChainID, status.ContractAddress)
-    return r.redis.SAdd(ctx, key, status.IntentID)
+	return r.redis.SAdd(ctx, key, status.IntentID)
 }
 
 func (r *IntentRepository) addToTxHashIndex(ctx context.Context, status *domain.IntentStatus) error {
 	key := r.getTxHashKey(status.ChainID, status.TxHash)
-    return r.redis.SAdd(ctx, key, status.IntentID)
+	return r.redis.SAdd(ctx, key, status.IntentID)
 }
 
 func (r *IntentRepository) getContractKey(chainID, contractAddress string) string {
@@ -255,7 +255,7 @@ func (r *IntentRepository) GetIntentsByStatus(ctx context.Context, status string
 	// This is a more expensive operation as we need to scan keys
 	pattern := intentStatusKeyPrefix + "*"
 
-    keys, err := r.redis.Keys(ctx, pattern)
+	keys, err := r.redis.Keys(ctx, pattern)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get intent keys: %w", err)
 	}
@@ -289,7 +289,7 @@ func (r *IntentRepository) GetIntentStatistics(ctx context.Context) (map[string]
 
 	// Count total intents
 	pattern := intentStatusKeyPrefix + "*"
-    keys, err := r.redis.Keys(ctx, pattern)
+	keys, err := r.redis.Keys(ctx, pattern)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get intent keys: %w", err)
 	}
@@ -297,7 +297,7 @@ func (r *IntentRepository) GetIntentStatistics(ctx context.Context) (map[string]
 	stats["total_intents"] = len(keys)
 
 	// Count expired intents
-    expiredCount, err := r.redis.SCard(ctx, expiredIntentsKey)
+	expiredCount, err := r.redis.SCard(ctx, expiredIntentsKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get expired count: %w", err)
 	}
@@ -328,14 +328,14 @@ func (r *IntentRepository) GetIntentStatistics(ctx context.Context) (map[string]
 // CleanupExpiredIndexes removes expired intents from indexes
 func (r *IntentRepository) CleanupExpiredIndexes(ctx context.Context) error {
 	// Get contract index keys
-    contractKeys, err := r.redis.Keys(ctx, contractIntentsKeyPrefix+"*")
+	contractKeys, err := r.redis.Keys(ctx, contractIntentsKeyPrefix+"*")
 	if err != nil {
 		return fmt.Errorf("failed to get contract keys: %w", err)
 	}
 
 	// Clean up contract indexes
 	for _, contractKey := range contractKeys {
-        intentIDs, err := r.redis.SMembers(ctx, contractKey)
+		intentIDs, err := r.redis.SMembers(ctx, contractKey)
 		if err != nil {
 			continue
 		}
@@ -343,7 +343,7 @@ func (r *IntentRepository) CleanupExpiredIndexes(ctx context.Context) error {
 		for _, intentID := range intentIDs {
 			// Check if intent still exists
 			statusKey := intentStatusKeyPrefix + intentID
-            exists, err := r.redis.Exists(ctx, statusKey)
+			exists, err := r.redis.Exists(ctx, statusKey)
 			if err != nil || exists == 0 {
 				// Remove from index
 				r.redis.SRem(ctx, contractKey, intentID)
@@ -351,35 +351,35 @@ func (r *IntentRepository) CleanupExpiredIndexes(ctx context.Context) error {
 		}
 
 		// Remove empty sets
-        count, err := r.redis.SCard(ctx, contractKey)
+		count, err := r.redis.SCard(ctx, contractKey)
 		if err == nil && count == 0 {
-            _ = r.redis.Delete(ctx, contractKey)
+			_ = r.redis.Delete(ctx, contractKey)
 		}
 	}
 
 	// Similarly clean up tx hash indexes
-    txHashKeys, err := r.redis.Keys(ctx, txHashIntentsKeyPrefix+"*")
+	txHashKeys, err := r.redis.Keys(ctx, txHashIntentsKeyPrefix+"*")
 	if err != nil {
 		return fmt.Errorf("failed to get tx hash keys: %w", err)
 	}
 
 	for _, txHashKey := range txHashKeys {
-        intentIDs, err := r.redis.SMembers(ctx, txHashKey)
+		intentIDs, err := r.redis.SMembers(ctx, txHashKey)
 		if err != nil {
 			continue
 		}
 
 		for _, intentID := range intentIDs {
 			statusKey := intentStatusKeyPrefix + intentID
-            exists, err := r.redis.Exists(ctx, statusKey)
+			exists, err := r.redis.Exists(ctx, statusKey)
 			if err != nil || exists == 0 {
 				r.redis.SRem(ctx, txHashKey, intentID)
 			}
 		}
 
-        count, err := r.redis.SCard(ctx, txHashKey)
+		count, err := r.redis.SCard(ctx, txHashKey)
 		if err == nil && count == 0 {
-            _ = r.redis.Delete(ctx, txHashKey)
+			_ = r.redis.Delete(ctx, txHashKey)
 		}
 	}
 

@@ -120,14 +120,14 @@ func (suite *WalletServiceTestSuite) TestUpsertLink_NewWallet() {
 		Run(func(args mock.Arguments) {
 			fn := args.Get(1).(func(domain.TxWalletRepository) error)
 
-		// Mock transaction operations for new wallet scenario
-		mockTxRepo.On("AcquireAccountLock", ctx, link.AccountID).Return(nil)
-		mockTxRepo.On("AcquireAddressLock", ctx, link.ChainID, link.Address).Return(nil)
-		mockTxRepo.On("GetByAddressTx", ctx, link.ChainID, link.Address).Return((*domain.WalletLink)(nil), domain.ErrWalletNotFound)
-		mockTxRepo.On("GetByAccountIDTx", ctx, link.AccountID).Return((*domain.WalletLink)(nil), domain.ErrWalletNotFound)
-		// GetPrimaryByUserChainTx is NOT called when IsPrimary is true - it goes directly to DemoteOtherPrimariesTx
-		mockTxRepo.On("DemoteOtherPrimariesTx", ctx, link.UserID, link.ChainID, "").Return(nil)
-		mockTxRepo.On("InsertWalletTx", ctx, mock.AnythingOfType("domain.WalletLink")).Return(insertedLink, nil)
+			// Mock transaction operations for new wallet scenario
+			mockTxRepo.On("AcquireAccountLock", ctx, link.AccountID).Return(nil)
+			mockTxRepo.On("AcquireAddressLock", ctx, link.ChainID, link.Address).Return(nil)
+			mockTxRepo.On("GetByAddressTx", ctx, link.ChainID, link.Address).Return((*domain.WalletLink)(nil), domain.ErrWalletNotFound)
+			mockTxRepo.On("GetByAccountIDTx", ctx, link.AccountID).Return((*domain.WalletLink)(nil), domain.ErrWalletNotFound)
+			// GetPrimaryByUserChainTx is NOT called when IsPrimary is true - it goes directly to DemoteOtherPrimariesTx
+			mockTxRepo.On("DemoteOtherPrimariesTx", ctx, link.UserID, link.ChainID, "").Return(nil)
+			mockTxRepo.On("InsertWalletTx", ctx, mock.AnythingOfType("domain.WalletLink")).Return(insertedLink, nil)
 
 			fn(mockTxRepo)
 		}).Return(nil)

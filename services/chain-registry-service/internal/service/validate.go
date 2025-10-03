@@ -10,7 +10,7 @@ import (
 // ValidateChainID validates if a chain ID is in proper CAIP-2 format
 func ValidateChainID(chainID domain.ChainID) error {
 	if chainID == "" {
-        return fmt.Errorf("chain_id is required")
+		return fmt.Errorf("chain_id is required")
 	}
 
 	parts := strings.Split(string(chainID), ":")
@@ -60,8 +60,8 @@ func ValidateAddress(address domain.Address) error {
 // ValidateSha256 validates if a SHA256 hash is in proper format
 func ValidateSha256(sha domain.Sha256) error {
 	if sha == "" {
-        // Tests only require non-empty check and specific message
-        return fmt.Errorf("abi_sha256 is required")
+		// Tests only require non-empty check and specific message
+		return fmt.Errorf("abi_sha256 is required")
 	}
 
 	return nil

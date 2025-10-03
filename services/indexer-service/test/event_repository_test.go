@@ -66,4 +66,3 @@ func TestEventDocumentConversion(t *testing.T) {
 		t.Fatalf("mismatch after conversion: %+v vs %+v", e2, e)
 	}
 }
-

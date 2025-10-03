@@ -8,7 +8,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
-    "go.mongodb.org/mongo-driver/v2/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"github.com/quangdang46/NFT-Marketplace/services/indexer-service/internal/domain"
 	mongoClient "github.com/quangdang46/NFT-Marketplace/shared/mongo"
@@ -51,13 +51,13 @@ func (r *EventRepository) createIndexes() {
 	ctx := context.Background()
 
 	// Unique compound index for deduplication (chainId, txHash, logIndex)
-    uniqueIndex := mongo.IndexModel{
+	uniqueIndex := mongo.IndexModel{
 		Keys: bson.D{
 			{Key: "chain_id", Value: 1},
 			{Key: "tx_hash", Value: 1},
 			{Key: "log_index", Value: 1},
 		},
-        Options: options.Index().SetUnique(true),
+		Options: options.Index().SetUnique(true),
 	}
 
 	// Index for querying by chain and block number
@@ -163,8 +163,8 @@ func (r *EventRepository) StoreRawEvent(ctx context.Context, event *domain.RawEv
 		"$setOnInsert": eventDoc,
 	}
 
-    updOpts := options.UpdateOne().SetUpsert(true)
-    result, err := r.collection.UpdateOne(ctx, filter, update, updOpts)
+	updOpts := options.UpdateOne().SetUpsert(true)
+	result, err := r.collection.UpdateOne(ctx, filter, update, updOpts)
 	if err != nil {
 		return fmt.Errorf("failed to store event: %w", err)
 	}
@@ -240,13 +240,13 @@ func (r *EventRepository) GetEventsByContract(ctx context.Context, chainID, cont
 		"contract_address": contractAddress,
 	}
 
-    // Build find options using v2 API (builder pattern)
-    findOpts := options.Find().SetSort(bson.M{"created_at": -1})
-    if limit > 0 {
-        findOpts = findOpts.SetLimit(limit)
-    }
+	// Build find options using v2 API (builder pattern)
+	findOpts := options.Find().SetSort(bson.M{"created_at": -1})
+	if limit > 0 {
+		findOpts = findOpts.SetLimit(limit)
+	}
 
-    cursor, err := r.collection.Find(ctx, filter, findOpts)
+	cursor, err := r.collection.Find(ctx, filter, findOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find events for contract: %w", err)
 	}

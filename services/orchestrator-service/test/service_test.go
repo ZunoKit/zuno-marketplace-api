@@ -50,8 +50,8 @@ func (m *MockRepo) FindByChainTx(ctx context.Context, chainID domain.ChainID, tx
 }
 
 func (m *MockRepo) InsertSessionIntentAudit(ctx context.Context, sessionID string, intentID string, createdBy *string, fields any) error {
-    args := m.Called(ctx, sessionID, intentID, createdBy, fields)
-    return args.Error(0)
+	args := m.Called(ctx, sessionID, intentID, createdBy, fields)
+	return args.Error(0)
 }
 
 // Mock status cache for testing
