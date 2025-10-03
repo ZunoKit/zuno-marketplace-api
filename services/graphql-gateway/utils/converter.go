@@ -109,7 +109,7 @@ func ConvertRPCAuthTypeToStrPtr(a chainregpb.RpcAuthType) *string {
 }
 
 // Utility functions
-func IntPtrIfNonZero[T ~int32 | ~uint32](v T) *int {
+func IntPtrIfNonZero[T ~int32 | ~uint32 | ~int64 | ~uint64](v T) *int {
 	if v == 0 {
 		return nil
 	}

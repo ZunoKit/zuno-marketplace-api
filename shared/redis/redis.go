@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/redis/go-redis/v9"
+	redislib "github.com/redis/go-redis/v9"
 )
 
 type RedisConfig struct {
@@ -17,14 +17,14 @@ type RedisConfig struct {
 }
 
 type Redis struct {
-	conn *redis.Client
+	conn *redislib.Client
 }
 
 func NewRedis(cfg RedisConfig) (*Redis, error) {
 
 	url := fmt.Sprintf("%s:%d", cfg.RedisHost, cfg.RedisPort)
 	log.Println("===>Redis URL: ", url)
-	conn := redis.NewClient(&redis.Options{
+	conn := redislib.NewClient(&redislib.Options{
 		Addr:     url,
 		Password: cfg.RedisPassword,
 		DB:       cfg.RedisDB,
@@ -37,7 +37,7 @@ func (r *Redis) HealthCheck(ctx context.Context) error {
 	return r.conn.Ping(ctx).Err()
 }
 
-func (r *Redis) GetClient() *redis.Client {
+func (r *Redis) GetClient() *redislib.Client {
 	return r.conn
 }
 

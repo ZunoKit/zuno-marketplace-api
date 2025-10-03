@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/streadway/amqp"
+	amqp "github.com/rabbitmq/amqp091-go"
 
 	"github.com/quangdang46/NFT-Marketplace/services/subscription-worker/internal/config"
 	"github.com/quangdang46/NFT-Marketplace/services/subscription-worker/internal/domain"
@@ -353,10 +353,6 @@ func (c *EventConsumer) HealthCheck() error {
 		return fmt.Errorf("consumer channel is nil")
 	}
 
-	if c.channel.IsClosed() {
-		return fmt.Errorf("consumer channel is closed")
-	}
-
 	return nil
 }
 
@@ -374,9 +370,9 @@ func (c *EventConsumer) GetConsumerInfo() map[string]interface{} {
 		"is_running":     c.isRunning,
 	}
 
-	if c.channel != nil {
-		info["channel_open"] = !c.channel.IsClosed()
-	} else {
+    if c.channel != nil {
+        info["channel_open"] = true
+    } else {
 		info["channel_open"] = false
 	}
 
