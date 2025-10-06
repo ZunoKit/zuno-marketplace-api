@@ -1,0 +1,39 @@
+syntax = "proto3";
+package wallet;
+option go_package = "shared/proto/wallet;wallet";
+import "google/protobuf/timestamp.proto";
+
+message WalletLink {
+  string id         = 1;
+  string user_id    = 2;
+  string account_id = 3;
+  string address    = 4; // lowercase 0x…
+  string chain_id   = 5; // CAIP-2
+  bool   is_primary = 6;
+  google.protobuf.Timestamp verified_at = 7;
+  google.protobuf.Timestamp created_at  = 8;
+  google.protobuf.Timestamp updated_at  = 9;
+}
+
+message UpsertLinkRequest {
+  string user_id    = 1;
+  string account_id = 2;
+  string address    = 3; // lowercase 0x…
+  string chain_id   = 4; // CAIP-2
+  bool   is_primary = 5;
+
+  // optional meta (nice-to-have)
+  string type       = 6; // "eoa" | "contract"
+  string connector  = 7; // "metamask", "walletconnect", ...
+  string label      = 8;
+}
+
+message UpsertLinkResponse {
+  WalletLink link   = 1;
+  bool       created = 2;
+  bool       primary_changed = 3;
+}
+
+service WalletService {
+  rpc UpsertLink (UpsertLinkRequest) returns (UpsertLinkResponse);
+}

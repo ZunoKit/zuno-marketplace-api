@@ -1,0 +1,74 @@
+---
+alwaysApply: true
+---
+
+# Commit Message Rules
+
+## Format
+
+```
+<type>(<scope>): <description>
+
+<body>
+
+<footer>
+```
+
+## Rules
+
+1. **Header**: Max 50 characters
+2. **Body lines**: Max 100 characters each
+3. **Description**: Imperative mood (add, fix, update), lowercase, no period
+4. **Body**: Explain WHAT and WHY (not HOW), use bullet points
+
+## Types
+
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation
+- `style`: Code style (formatting, semicolons)
+- `refactor`: Code refactoring
+- `perf`: Performance improvements
+- `test`: Tests
+- `chore`: Maintenance (dependencies, build)
+- `ci`: CI/CD changes
+
+## Scopes (optional)
+
+`api`, `auth`, `database`, `config`, `utils`, `decorators`, `dto`, `middleware`
+
+## Examples
+
+### Good
+
+```
+feat(auth): add JWT token validation
+
+fix(database): resolve connection timeout issue
+
+- Increase connection pool size
+- Add retry mechanism for failed connections
+- Update database configuration
+```
+
+### Bad
+
+```
+❌ feat(api): implement comprehensive user management system with advanced features
+   (header too long)
+
+❌ - Updated SettingsController to improve API documentation for assistant scenarios
+   (body line over 100 chars)
+
+❌ Added new feature
+   (missing type and scope)
+```
+
+## Checklist
+
+- [ ] Type is conventional (feat, fix, docs, etc.)
+- [ ] Header ≤ 50 characters
+- [ ] Body lines ≤ 100 characters
+- [ ] Imperative mood in description
+- [ ] Body explains WHAT and WHY
+- [ ] No trailing period in header

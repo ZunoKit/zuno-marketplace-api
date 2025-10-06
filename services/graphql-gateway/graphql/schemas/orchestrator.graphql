@@ -1,0 +1,73 @@
+type TxRequest {
+  to: Address!
+  data: Hex!
+  value: String!
+  previewAddress: Address
+}
+type PrepareCreateCollectionPayload {
+  intentId: ID!
+  txRequest: TxRequest!
+}
+type PrepareMintPayload {
+  intentId: ID!
+  txRequest: TxRequest!
+}
+
+input PrepareCreateCollectionInput {
+  chainId: ChainId!
+  name: String!
+  symbol: String!
+  creator: Address!
+  tokenURI: String
+  type: String! # ERC721 or ERC1155 - specifies the collection type
+  description: String
+  mintPrice: BigInt
+  royaltyFee: BigInt
+  maxSupply: BigInt
+  mintLimitPerWallet: BigInt
+  mintStartTime: BigInt
+  mintEndTime: BigInt
+  allowlistMintPrice: BigInt
+  publicMintPrice: BigInt
+  allowlistStageDuration: BigInt
+}
+input PrepareMintInput {
+  chainId: ChainId!
+  contract: Address!
+  standard: String!
+  quantity: Int = 1
+}
+
+input TrackTxInput {
+  intentId: ID!
+  chainId: ChainId!
+  txHash: Hex!
+  contract: Address
+}
+
+enum IntentStatus {
+  pending
+  ready
+  failed
+  expired
+}
+type IntentStatusPayload {
+  intentId: ID!
+  kind: String!
+  status: IntentStatus!
+  chainId: ChainId
+  txHash: Hex
+  contractAddress: Address
+}
+
+extend type Mutation {
+  prepareCreateCollection(
+    input: PrepareCreateCollectionInput!
+  ): PrepareCreateCollectionPayload!
+  prepareMint(input: PrepareMintInput!): PrepareMintPayload!
+  trackTx(input: TrackTxInput!): Boolean! # true = ok
+}
+
+type Subscription {
+  onIntentStatus(intentId: ID!): IntentStatusPayload!
+}

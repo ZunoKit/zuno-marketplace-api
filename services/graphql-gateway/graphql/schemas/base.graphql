@@ -1,0 +1,19 @@
+# Shared scalar types
+scalar Address
+scalar ChainId
+scalar Hex
+scalar DateTime
+scalar Wei
+scalar Upload
+scalar CID
+scalar URL
+scalar BigInt
+type User {
+  id: ID!
+  # Add other user fields as needed
+}
+
+type Query {
+  health: String!
+  me: User
+}

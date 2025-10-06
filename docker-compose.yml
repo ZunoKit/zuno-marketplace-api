@@ -1,0 +1,498 @@
+services:
+  # Infrastructure Services
+  postgres:
+    image: postgres:15-alpine
+    container_name: nft-postgres
+    environment:
+      POSTGRES_DB: nft_marketplace
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./services/auth-service/db/up.sql:/docker-entrypoint-initdb.d/01-auth-schema.sql
+      - ./services/user-service/db/up.sql:/docker-entrypoint-initdb.d/02-user-schema.sql
+      - ./services/wallet-service/db/up.sql:/docker-entrypoint-initdb.d/03-wallet-schema.sql
+      - ./services/chain-registry-service/db/up.sql:/docker-entrypoint-initdb.d/04-chain-registry-schema.sql
+      - ./services/orchestrator-service/db/up.sql:/docker-entrypoint-initdb.d/05-orchestrator-schema.sql
+      - ./services/catalog-service/db/up.sql:/docker-entrypoint-initdb.d/06-catalog-schema.sql
+      - ./services/indexer-service/db/up.sql:/docker-entrypoint-initdb.d/07-indexer-schema.sql
+    networks:
+      - nft-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: nft-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - nft-network
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: nft-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - nft-network
+
+  mongo:
+    image: mongo:6
+    container_name: nft-mongo
+    environment:
+      MONGO_INITDB_DATABASE: nft_marketplace
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - nft-network
+
+  # Application Services
+  auth-service:
+    build:
+      context: .
+      dockerfile: infra/development/docker/auth-service.Dockerfile
+      args:
+        - CGO_ENABLED=0
+        - GOOS=linux
+        - GOARCH=amd64
+    container_name: nft-auth-service
+    env_file:
+      - .env
+    environment:
+      - AUTH_GRPC_PORT=:50051
+      - USER_SERVICE_URL=user-service:50052
+      - WALLET_SERVICE_URL=wallet-service:50053
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DATABASE=nft_marketplace
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASSWORD=guest
+      - JWT_SECRET=${JWT_SECRET}
+      - REFRESH_SECRET=${REFRESH_SECRET}
+    ports:
+      - "50051:50051"
+
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    networks:
+      - nft-network
+    develop:
+      watch:
+        - path: ./shared
+          target: /app/shared
+          action: sync
+        - path: ./services/auth-service
+          target: /app/services/auth-service
+          action: sync
+        - path: ./go.mod
+          target: /app/go.mod
+          action: sync
+        - path: ./go.sum
+          target: /app/go.sum
+          action: sync
+        - path: .
+          action: rebuild
+
+  user-service:
+    build:
+      context: .
+      dockerfile: infra/development/docker/user-service.Dockerfile
+    container_name: nft-user-service
+    environment:
+      - USER_GRPC_PORT=:50052
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DATABASE=nft_marketplace
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASSWORD=guest
+    ports:
+      - "50052:50052"
+    # volumes removed; using compose watch instead
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    networks:
+      - nft-network
+    develop:
+      watch:
+        - path: ./shared
+          target: /app/shared
+          action: sync
+        - path: ./services/user-service
+          target: /app/services/user-service
+          action: sync
+        - path: ./go.mod
+          target: /app/go.mod
+          action: sync
+        - path: ./go.sum
+          target: /app/go.sum
+          action: sync
+        - path: .
+          action: rebuild
+
+  wallet-service:
+    build:
+      context: .
+      dockerfile: infra/development/docker/wallet-service.Dockerfile
+    container_name: nft-wallet-service
+    environment:
+      - WALLET_GRPC_PORT=:50053
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DATABASE=nft_marketplace
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASSWORD=guest
+    ports:
+      - "50053:50053"
+    # volumes removed; using compose watch instead
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    networks:
+      - nft-network
+    develop:
+      watch:
+        - path: ./shared
+          target: /app/shared
+          action: sync
+        - path: ./services/wallet-service
+          target: /app/services/wallet-service
+          action: sync
+        - path: ./go.mod
+          target: /app/go.mod
+          action: sync
+        - path: ./go.sum
+          target: /app/go.sum
+          action: sync
+        - path: .
+          action: rebuild
+
+  orchestrator-service:
+    build:
+      context: .
+      dockerfile: infra/development/docker/orchestrator-service.Dockerfile
+    container_name: nft-orchestrator-service
+    environment:
+      - ORCHESTRATOR_GRPC_PORT=:50054
+      - CHAIN_REGISTRY_URL=chain-registry-service:50056
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DATABASE=nft_marketplace
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASSWORD=guest
+    ports:
+      - "50054:50054"
+    # volumes removed; using compose watch instead
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    networks:
+      - nft-network
+    develop:
+      watch:
+        - path: ./shared
+          target: /app/shared
+          action: sync
+        - path: ./services/orchestrator-service
+          target: /app/services/orchestrator-service
+          action: sync
+        - path: ./go.mod
+          target: /app/go.mod
+          action: sync
+        - path: ./go.sum
+          target: /app/go.sum
+          action: sync
+        - path: .
+          action: rebuild
+
+
+
+  media-service:
+    build:
+      context: .
+      dockerfile: infra/development/docker/media-service.Dockerfile
+    container_name: nft-media-service
+    env_file:
+      - .env
+    environment:
+      - MEDIA_GRPC_PORT=:50055
+
+      
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASSWORD=guest
+      
+      - MONGO_URI=mongodb://mongo:27017
+      - MONGO_DATABASE=nft_marketplace
+      - PINATA_BASE_URL=https://api.pinata.cloud
+      - PINATA_GATEWAY_URL=https://gateway.pinata.cloud
+      - PINATA_API_KEY=${PINATA_API_KEY}
+      - PINATA_SECRET_KEY=${PINATA_SECRET_KEY}
+      - PINATA_JWT_KEY=${PINATA_JWT_KEY}
+    ports:
+      - "50055:50055"
+
+    depends_on:
+      - mongo
+      - redis
+      - rabbitmq
+    networks:
+      - nft-network
+    develop:
+      watch:
+        - path: ./shared
+          target: /app/shared
+          action: sync
+        - path: ./services/media-service
+          target: /app/services/media-service
+          action: sync
+        - path: ./go.mod
+          target: /app/go.mod
+          action: sync
+        - path: ./go.sum
+          target: /app/go.sum
+          action: sync
+        - path: .
+          action: rebuild
+
+
+  chain-registry-service:
+    build:
+      context: .
+      dockerfile: infra/development/docker/chain-registry-service.Dockerfile
+    container_name: nft-chain-registry-service
+    environment:
+      - CHAIN_REGISTRY_GRPC_PORT=:50056
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DATABASE=nft_marketplace
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASSWORD=guest
+    ports:
+      - "50056:50056"
+    # volumes removed; using compose watch instead
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    networks:
+      - nft-network
+    develop:
+      watch:
+        - path: ./shared
+          target: /app/shared
+          action: sync
+        - path: ./services/chain-registry-service
+          target: /app/services/chain-registry-service
+          action: sync
+        - path: ./go.mod
+          target: /app/go.mod
+          action: sync
+        - path: ./go.sum
+          target: /app/go.sum
+          action: sync
+        - path: .
+          action: rebuild
+
+  catalog-service:
+    build:
+      context: .
+      dockerfile: infra/development/docker/catalog-service.Dockerfile
+    container_name: nft-catalog-service
+    environment:
+      - CATALOG_GRPC_PORT=:50057
+
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DATABASE=nft_marketplace
+
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASSWORD=guest
+    ports:
+      - "50057:50057"
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    networks:
+      - nft-network
+    develop:
+      watch:
+        - path: ./shared
+          target: /app/shared
+          action: sync
+        - path: ./services/catalog-service
+          target: /app/services/catalog-service
+          action: sync
+        - path: ./go.mod
+          target: /app/go.mod
+          action: sync
+        - path: ./go.sum
+          target: /app/go.sum
+          action: sync
+        - path: .
+          action: rebuild
+
+  indexer-service:
+    build:
+      context: .
+      dockerfile: infra/development/docker/indexer-service.Dockerfile
+    container_name: nft-indexer-service
+    environment:
+      - INDEXER_GRPC_PORT=:50058
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASSWORD=guest
+
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DATABASE=nft_marketplace
+
+      - MONGO_URI=mongodb://mongo:27017
+      - MONGO_DATABASE=nft_marketplace
+
+      - RABBITMQ_EXCHANGE=nft-marketplace
+      - ETH_SEPOLIA_RPC=${ETH_SEPOLIA_RPC}
+      - ANVIL_RPC=${ANVIL_RPC}
+    depends_on:
+      - postgres
+      - mongo
+      - rabbitmq
+      - redis
+    networks:
+      - nft-network
+    develop:
+      watch:
+        - path: ./shared
+          target: /app/shared
+          action: sync
+        - path: ./services/indexer-service
+          target: /app/services/indexer-service
+          action: sync
+        - path: ./go.mod
+          target: /app/go.mod
+          action: sync
+        - path: ./go.sum
+          target: /app/go.sum
+          action: sync
+        - path: .
+          action: rebuild
+
+
+
+
+  graphql-gateway:
+    build:
+      context: .
+      dockerfile: infra/development/docker/graph-gateway.Dockerfile
+    container_name: nft-graphql-gateway
+    environment:
+      - GATEWAY_HTTP_ADDR=:8081
+      - AUTH_SERVICE_URL=auth-service:50051
+      - USER_SERVICE_URL=user-service:50052
+      - WALLET_SERVICE_URL=wallet-service:50053
+      - MEDIA_SERVICE_URL=media-service:50055
+      - CHAIN_REGISTRY_SERVICE_URL=chain-registry-service:50056
+      - ORCHESTRATOR_SERVICE_URL=orchestrator-service:50054
+      - CATALOG_SERVICE_URL=catalog-service:50057
+      - INDEXER_SERVICE_URL=indexer-service:50058
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASSWORD=guest
+    ports:
+      - "8081:8081"
+    # volumes removed; using compose watch instead
+    depends_on:
+      - auth-service
+      - user-service
+      - wallet-service
+      - media-service
+      - chain-registry-service
+      - orchestrator-service
+      - catalog-service
+    networks:
+      - nft-network
+    develop:
+      watch:
+        - path: ./shared
+          target: /app/shared
+          action: sync
+        - path: ./services/graphql-gateway
+          target: /app/services/graphql-gateway
+          action: sync
+        - path: ./go.mod
+          target: /app/go.mod
+          action: sync
+        - path: ./go.sum
+          target: /app/go.sum
+          action: sync
+        - path: .
+          action: rebuild
+
+volumes:
+  postgres_data:
+  mongo_data:
+
+networks:
+  nft-network:
+    driver: bridge
