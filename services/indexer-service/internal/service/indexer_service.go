@@ -13,9 +13,6 @@ import (
 )
 
 const (
-	// CollectionCreated event signature (keccak256 hash)
-	CollectionCreatedSignature = "0x4d72fe0577a3a3f7da968d7b892779dde102519c25c1838b6653ccc4b0b96d2e" // Placeholder
-
 	// Batch processing settings
 	MaxBlockBatchSize = 100
 	MaxRetries        = 3
@@ -222,7 +219,7 @@ func (s *IndexerService) processChainEvents(ctx context.Context, chainID, factor
 			FromBlock: fromBlock,
 			ToBlock:   toBlock,
 			Addresses: []string{factoryAddress},
-			Topics:    []string{CollectionCreatedSignature},
+			Topics:    []string{domain.CollectionCreatedSignature},
 		}
 
 		logs, err := client.GetLogs(ctx, filter)
@@ -288,7 +285,7 @@ func (s *IndexerService) processCollectionCreatedLog(ctx context.Context, chainI
 		BlockHash:       log.BlockHash,
 		ContractAddress: log.Address,
 		EventName:       "CollectionCreated",
-		EventSignature:  CollectionCreatedSignature,
+		EventSignature:  domain.CollectionCreatedSignature,
 		RawData: map[string]interface{}{
 			"topics": log.Topics,
 			"data":   log.Data,

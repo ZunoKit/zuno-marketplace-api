@@ -110,6 +110,9 @@ func (suite *WalletServiceTestSuite) TestUpsertLink_CreateNew() {
 	// Mock create link
 	suite.mockRepo.On("CreateLink", ctx, mock.AnythingOfType("*domain.WalletLink")).Return(nil)
 
+	// Mock event publisher
+	suite.mockPublisher.On("PublishWalletLinked", ctx, mock.AnythingOfType("*domain.WalletLinkedEvent")).Return(nil)
+
 	// Act
 	link, created, primaryChanged, err := suite.walletService.UpsertLink(
 		ctx, userID, accountID, address, chainID, true, "eoa", "metamask", "My Wallet",
