@@ -1,0 +1,43 @@
+syntax = "proto3";
+package user;
+option go_package = "shared/proto/user;user";
+
+message User {
+  string id = 1;
+  string status = 2;           // active, banned, ...
+  string created_at = 3;
+}
+
+message Profile {
+  string user_id = 1;
+  string username = 2;
+  string display_name = 3;
+  string avatar_url = 4;
+  string banner_url = 5;
+  string bio = 6;
+  string locale = 7;
+  string timezone = 8;
+  string socials_json = 9;
+  string updated_at = 10;
+}
+
+message EnsureUserRequest {
+  string account_id = 1; // ví dụ: eoa:0x..., hay user-centric id khác
+  string address    = 2; // "0x..." (lowercase)
+  string chain_id   = 3; // CAIP-2 (optional hint)
+}
+message EnsureUserResponse {
+  string user_id = 1;
+  bool created   = 2; // true nếu vừa tạo
+}
+
+message GetUserRequest { string user_id = 1; }
+message GetUserResponse { User user = 1; Profile profile = 2; }
+
+message UpsertProfileRequest { Profile profile = 1; }
+message UpsertProfileResponse { Profile profile = 1; }
+
+service UserService {
+  rpc EnsureUser(EnsureUserRequest) returns (EnsureUserResponse);
+
+}

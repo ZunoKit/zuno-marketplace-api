@@ -1,0 +1,32 @@
+type NoncePayload {
+  nonce: String!
+}
+
+type AuthPayload {
+  accessToken: String!
+  refreshToken: String! # Trả về trong body, đồng thời set httpOnly cookie
+  expiresAt: DateTime!
+  userId: ID!
+}
+
+input SignInSiweInput {
+  accountId: String!
+  chainId: ChainId!
+  domain: String!
+}
+
+input VerifySiweInput {
+  accountId: String!
+  message: String!
+  signature: Hex!
+}
+
+type Mutation {
+  signInSiwe(input: SignInSiweInput!): NoncePayload!
+  verifySiwe(input: VerifySiweInput!): AuthPayload!
+  refreshSession: AuthPayload!
+  logout: Boolean!
+
+  # Example protected mutation - requires authentication
+  updateProfile(displayName: String): Boolean!
+}

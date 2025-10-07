@@ -1,0 +1,76 @@
+enum RpcAuthType { NONE KEY BASIC BEARER }
+enum ContractStandard { ERC721 ERC1155 PROXY DIAMOND CUSTOM }
+
+type Contract {
+  name: String!
+  address: Address!
+  startBlock: Int
+  verifiedAt: DateTime
+  standard: ContractStandard
+  implAddress: Address         # nếu là proxy
+  abiSha256: String            # content-addressed
+  abiUrl: URL                  # optional, nếu muốn cấp link S3/IPFS cho FE/devtools
+}
+
+type ChainParams {
+  requiredConfirmations: Int!
+  reorgDepth: Int!            # ví dụ 12
+  blockTimeMs: Int            # optional
+}
+
+type ChainContracts {
+  chainId: ChainId!
+  chainNumeric: Int!
+  nativeSymbol: String
+  contracts: [Contract!]!
+  params: ChainParams!        # thay vì đặt rời rạc
+  registryVersion: String!
+}
+
+
+type GasPolicy {
+  maxFeeGwei: Float!
+  priorityFeeGwei: Float!
+  multiplier: Float!
+  lastObservedBaseFeeGwei: Float
+  updatedAt: DateTime
+}
+type RpcEndpoint {
+  url: URL!
+  priority: Int!
+  weight: Int!
+  authType: String
+  rateLimit: Int
+  active: Boolean!
+}
+
+type ChainGasPolicy {
+  chainId: ChainId!
+  policy: GasPolicy!
+  registryVersion: String!
+}
+type ChainRpcEndpoints {
+  chainId: ChainId!
+  endpoints: [RpcEndpoint!]!
+  registryVersion: String!
+}
+
+type ContractMeta {
+  chainId: ChainId!
+  contract: Contract!
+  registryVersion: String!
+}
+
+extend type Query {
+  chainContracts(chainId: ChainId!): ChainContracts!
+  chainGasPolicy(chainId: ChainId!): ChainGasPolicy!
+  chainRpcEndpoints(chainId: ChainId!): ChainRpcEndpoints!
+  contractMeta(chainId: ChainId!, address: Address!): ContractMeta!
+}
+
+# Admin
+input BumpChainVersionInput { chainId: ChainId!, reason: String }
+type BumpChainVersionPayload { ok: Boolean!, newVersion: String! }
+extend type Mutation {
+  bumpChainVersion(input: BumpChainVersionInput!): BumpChainVersionPayload!
+}

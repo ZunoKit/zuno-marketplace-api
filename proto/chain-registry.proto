@@ -1,0 +1,95 @@
+syntax = "proto3";
+package chainregistry;
+option go_package = "shared/proto/chainregistry;chainregistry";
+
+// ===== Enums =====
+enum RpcAuthType { RPC_AUTH_NONE = 0; RPC_AUTH_KEY = 1; RPC_AUTH_BASIC = 2; RPC_AUTH_BEARER = 3; }
+enum ContractStandard { STD_CUSTOM = 0; STD_ERC721 = 1; STD_ERC1155 = 2; STD_PROXY = 3; STD_DIAMOND = 4; }
+
+// ===== Models =====
+message Contract {
+  string name = 1;
+  string address = 2;                    // 0x...
+  int32  start_block = 3;
+  string verified_at = 4;                // RFC3339
+  ContractStandard standard = 5;         // <— thêm
+  string impl_address = 6;               // <— thêm (proxy)
+  string abi_sha256 = 7;                 // <— thêm
+}
+
+message GasPolicy {
+  double max_fee_gwei = 1;
+  double priority_fee_gwei = 2;
+  double multiplier = 3;
+  double last_observed_base_fee_gwei = 4;
+  string updated_at = 5;                 // RFC3339
+}
+
+message RpcEndpoint {
+  string url = 1;
+  int32  priority = 2;
+  int32  weight = 3;
+  RpcAuthType auth_type = 4;             // enum
+  int32  rate_limit = 5;
+  bool   active = 6;
+}
+
+message ChainParams {
+  uint32 required_confirmations = 1;
+  uint32 reorg_depth = 2;                // <— thêm
+  uint32 block_time_ms = 3;              // <— thêm
+}
+
+// ===== Requests / Responses =====
+message GetContractsRequest { string chain_id = 1; } // eip155:1
+message GetContractsResponse {
+  string chain_id = 1;
+  uint64 chain_numeric = 2;
+  repeated Contract contracts = 3;
+  ChainParams params = 4;                // <— gom vào đây
+  string registry_version = 5;
+  string native_symbol = 6;
+}
+
+message GetGasPolicyRequest { string chain_id = 1; }
+message GetGasPolicyResponse { string chain_id = 1; GasPolicy policy = 2; string registry_version = 3; }
+
+message GetRpcEndpointsRequest { string chain_id = 1; }
+message GetRpcEndpointsResponse { string chain_id = 1; repeated RpcEndpoint endpoints = 2; string registry_version = 3; }
+
+message GetContractMetaRequest { string chain_id = 1; string address = 2; }   // <— mới
+message GetContractMetaResponse { string chain_id = 1; Contract contract = 2; string registry_version = 3; }
+
+message GetAbiBlobRequest { string abi_sha256 = 1; }                          // <— mới
+message GetAbiBlobResponse { string abi_json = 1; string etag = 2; }           // trả raw ABI
+
+// Friendly: get ABI directly by chain+address
+message GetAbiByAddressRequest { string chain_id = 1; string address = 2; }
+
+message ResolveProxyRequest { string chain_id = 1; string address = 2; }       // <— mới
+message ResolveProxyResponse {
+  string chain_id = 1;
+  string proxy_address = 2;
+  string impl_address = 3;
+  string abi_sha256 = 4;
+  string registry_version = 5;
+}
+
+message BumpVersionRequest { string chain_id = 1; string reason = 2; }
+message BumpVersionResponse { bool ok = 1; string new_version = 2; }
+
+// ===== Service =====
+service ChainRegistryService {
+  rpc GetContracts      (GetContractsRequest)      returns (GetContractsResponse);
+  rpc GetGasPolicy      (GetGasPolicyRequest)      returns (GetGasPolicyResponse);
+  rpc GetRpcEndpoints   (GetRpcEndpointsRequest)   returns (GetRpcEndpointsResponse);
+
+  // mới:
+  rpc GetContractMeta   (GetContractMetaRequest)   returns (GetContractMetaResponse);
+  rpc GetAbiBlob        (GetAbiBlobRequest)        returns (GetAbiBlobResponse);
+  rpc GetAbiByAddress   (GetAbiByAddressRequest)   returns (GetAbiBlobResponse);
+  rpc ResolveProxy      (ResolveProxyRequest)      returns (ResolveProxyResponse);
+
+  // admin:
+  rpc BumpVersion       (BumpVersionRequest)       returns (BumpVersionResponse);
+}
