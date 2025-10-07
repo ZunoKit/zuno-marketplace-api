@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/quangdang46/NFT-Marketplace/services/user-service/internal/domain"
 	"github.com/quangdang46/NFT-Marketplace/services/user-service/internal/infrastructure/repository"
 	"github.com/quangdang46/NFT-Marketplace/shared/postgres"
 	"github.com/quangdang46/NFT-Marketplace/shared/redis"
@@ -33,7 +32,7 @@ func (suite *UserRepositoryTestSuite) SetupTest() {
 	suite.mockPG = &postgres.Postgres{} // You'd need to implement a proper mock
 	suite.mockRedis = &redis.Redis{}    // You'd need to implement a proper mock
 
-	suite.repo = repository.NewUserRepository(suite.mockPG, suite.mockRedis).(*repository.Repository)
+	suite.repo = repository.NewUserRepository(suite.mockPG).(*repository.Repository)
 }
 
 func (suite *UserRepositoryTestSuite) TearDownTest() {
@@ -90,7 +89,7 @@ func (suite *UserRepositoryTestSuite) TestCreateProfileTx_Success() {
 	userID := "user-789"
 
 	suite.mock.ExpectExec(`INSERT INTO profiles \(user_id, locale, timezone, socials_json, updated_at\)`).
-		WithArgs(userID, domain.DefaultLocale, domain.DefaultTimezone).
+		WithArgs(userID, "en-US", "UTC").
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	assert.NotEmpty(suite.T(), userID)

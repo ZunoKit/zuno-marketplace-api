@@ -1,0 +1,344 @@
+openapi: 3.0.3
+info:
+  title: NFT Marketplace Auth Service API
+  description: Authentication service with Sign-In with Ethereum (SIWE) support
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: api@nftmarketplace.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:50051
+    description: Local development server
+  - url: https://api.nftmarketplace.com
+    description: Production server
+
+tags:
+  - name: Authentication
+    description: SIWE authentication operations
+  - name: Session
+    description: Session management operations
+
+paths:
+  /auth/nonce:
+    post:
+      tags:
+        - Authentication
+      summary: Generate authentication nonce
+      description: Generates a one-time nonce for SIWE authentication
+      operationId: getNonce
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GetNonceRequest'
+      responses:
+        '200':
+          description: Nonce generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetNonceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /auth/verify:
+    post:
+      tags:
+        - Authentication
+      summary: Verify SIWE signature
+      description: Verifies the SIWE message signature and creates a session
+      operationId: verifySiwe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifySiweRequest'
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifySiweResponse'
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: Refresh token cookie
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /auth/refresh:
+    post:
+      tags:
+        - Session
+      summary: Refresh access token
+      description: Refreshes the access token using refresh token
+      operationId: refreshSession
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshSessionRequest'
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshSessionResponse'
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: New refresh token cookie
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /auth/logout:
+    post:
+      tags:
+        - Session
+      summary: Logout user
+      description: Revokes the current session and clears cookies
+      operationId: logout
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: Cleared refresh token cookie
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  schemas:
+    GetNonceRequest:
+      type: object
+      required:
+        - account_id
+        - chain_id
+        - domain
+      properties:
+        account_id:
+          type: string
+          pattern: '^0x[0-9a-fA-F]{40}$'
+          description: Ethereum wallet address
+          example: "0x1234567890123456789012345678901234567890"
+        chain_id:
+          type: string
+          pattern: '^[a-z0-9]+:[a-zA-Z0-9]+$'
+          description: CAIP-2 chain identifier
+          example: "eip155:1"
+        domain:
+          type: string
+          description: Domain requesting authentication
+          example: "app.nftmarketplace.com"
+
+    GetNonceResponse:
+      type: object
+      properties:
+        nonce:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: 64 character hex nonce
+          example: "32f5a8b6c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8"
+
+    VerifySiweRequest:
+      type: object
+      required:
+        - account_id
+        - message
+        - signature
+      properties:
+        account_id:
+          type: string
+          pattern: '^0x[0-9a-fA-F]{40}$'
+          description: Ethereum wallet address
+          example: "0x1234567890123456789012345678901234567890"
+        message:
+          type: string
+          description: SIWE message to verify
+          example: "app.nftmarketplace.com wants you to sign in with your Ethereum account..."
+        signature:
+          type: string
+          pattern: '^0x[0-9a-f]{130}$'
+          description: Hex encoded signature
+          example: "0x..."
+
+    VerifySiweResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          description: JWT access token
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        refresh_token:
+          type: string
+          description: Refresh token
+          example: "32f5a8b6c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8"
+        expires_at:
+          type: string
+          format: date-time
+          description: Token expiration time
+          example: "2024-01-01T12:00:00Z"
+        user_id:
+          type: string
+          format: uuid
+          description: User ID
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        address:
+          type: string
+          description: Wallet address
+          example: "0x1234567890123456789012345678901234567890"
+        chain_id:
+          type: string
+          description: Chain ID
+          example: "eip155:1"
+
+    RefreshSessionRequest:
+      type: object
+      properties:
+        refresh_token:
+          type: string
+          description: Refresh token (if not in cookie)
+        user_agent:
+          type: string
+          description: User agent string
+        ip_address:
+          type: string
+          description: Client IP address
+
+    RefreshSessionResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          description: New JWT access token
+        refresh_token:
+          type: string
+          description: New refresh token
+        expires_at:
+          type: string
+          format: date-time
+          description: Token expiration time
+        user_id:
+          type: string
+          format: uuid
+          description: User ID
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+          description: Error code
+        message:
+          type: string
+          description: Error message
+        details:
+          type: object
+          additionalProperties: true
+          description: Additional error details
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "INVALID_INPUT"
+            message: "Invalid request parameters"
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "UNAUTHORIZED"
+            message: "Authentication failed"
+
+    RateLimitExceeded:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "RATE_LIMIT_EXCEEDED"
+            message: "Too many requests, please try again later"
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+          description: Rate limit ceiling
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+          description: Remaining requests
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+          description: Reset time (Unix timestamp)
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "INTERNAL_ERROR"
+            message: "An unexpected error occurred"
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT access token
+    
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: refresh_token
+      description: Refresh token cookie

@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -20,9 +21,25 @@ type MockUserService struct {
 	mock.Mock
 }
 
-func (m *MockUserService) EnsureUser(ctx context.Context, accountID, address, chainID string) (*domain.EnsureUserResult, error) {
+func (m *MockUserService) EnsureUser(ctx context.Context, accountID, address, chainID string) (domain.UserID, bool, error) {
 	args := m.Called(ctx, accountID, address, chainID)
-	return args.Get(0).(*domain.EnsureUserResult), args.Error(1)
+	return args.Get(0).(domain.UserID), args.Bool(1), args.Error(2)
+}
+
+func (m *MockUserService) GetUser(ctx context.Context, userID domain.UserID) (*domain.User, *domain.Profile, error) {
+	args := m.Called(ctx, userID)
+	if args.Get(0) == nil {
+		return nil, nil, args.Error(2)
+	}
+	return args.Get(0).(*domain.User), args.Get(1).(*domain.Profile), args.Error(2)
+}
+
+func (m *MockUserService) UpdateProfile(ctx context.Context, profile *domain.Profile) (*domain.Profile, error) {
+	args := m.Called(ctx, profile)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.Profile), args.Error(1)
 }
 
 // UserGRPCTestSuite defines the test suite for User gRPC handler
@@ -36,7 +53,8 @@ type UserGRPCTestSuite struct {
 
 func (suite *UserGRPCTestSuite) SetupTest() {
 	suite.mockService = new(MockUserService)
-	suite.handler = grpcHandler.NewgRPCHandler(suite.mockService)
+	server := grpc.NewServer()
+	suite.handler = grpcHandler.NewgRPCHandler(server, suite.mockService)
 }
 
 func (suite *UserGRPCTestSuite) TestEnsureUser_Success_NewUser() {
@@ -47,20 +65,18 @@ func (suite *UserGRPCTestSuite) TestEnsureUser_Success_NewUser() {
 		ChainId:   "eip155:1",
 	}
 
-	expectedResult := &domain.EnsureUserResult{
-		UserID:  "user-789",
-		Created: true,
-	}
+	expectedUserID := domain.UserID("user-789")
+	expectedCreated := true
 
 	suite.mockService.On("EnsureUser", ctx, req.AccountId, req.Address, req.ChainId).
-		Return(expectedResult, nil)
+		Return(expectedUserID, expectedCreated, nil)
 
 	resp, err := suite.handler.EnsureUser(ctx, req)
 
 	suite.NoError(err)
 	suite.NotNil(resp)
-	suite.Equal(expectedResult.UserID, resp.UserId)
-	suite.Equal(expectedResult.Created, resp.Created)
+	suite.Equal(string(expectedUserID), resp.UserId)
+	suite.Equal(expectedCreated, resp.Created)
 	suite.mockService.AssertExpectations(suite.T())
 }
 
@@ -72,20 +88,18 @@ func (suite *UserGRPCTestSuite) TestEnsureUser_Success_ExistingUser() {
 		ChainId:   "eip155:1",
 	}
 
-	expectedResult := &domain.EnsureUserResult{
-		UserID:  "user-456",
-		Created: false,
-	}
+	expectedUserID := domain.UserID("user-456")
+	expectedCreated := false
 
 	suite.mockService.On("EnsureUser", ctx, req.AccountId, req.Address, req.ChainId).
-		Return(expectedResult, nil)
+		Return(expectedUserID, expectedCreated, nil)
 
 	resp, err := suite.handler.EnsureUser(ctx, req)
 
 	suite.NoError(err)
 	suite.NotNil(resp)
-	suite.Equal(expectedResult.UserID, resp.UserId)
-	suite.Equal(expectedResult.Created, resp.Created)
+	suite.Equal(string(expectedUserID), resp.UserId)
+	suite.Equal(expectedCreated, resp.Created)
 	suite.mockService.AssertExpectations(suite.T())
 }
 
@@ -155,7 +169,7 @@ func (suite *UserGRPCTestSuite) TestEnsureUser_ServiceError() {
 	}
 
 	suite.mockService.On("EnsureUser", ctx, req.AccountId, req.Address, req.ChainId).
-		Return((*domain.EnsureUserResult)(nil), domain.ErrInvalidAddress)
+		Return(domain.UserID(""), false, domain.ErrInvalidAddress)
 
 	resp, err := suite.handler.EnsureUser(ctx, req)
 
@@ -164,7 +178,7 @@ func (suite *UserGRPCTestSuite) TestEnsureUser_ServiceError() {
 
 	st, ok := status.FromError(err)
 	suite.True(ok)
-	suite.Equal(codes.Internal, st.Code())
+	suite.Equal(codes.InvalidArgument, st.Code())
 	suite.mockService.AssertExpectations(suite.T())
 }
 
@@ -176,9 +190,9 @@ func (suite *UserGRPCTestSuite) TestEnsureUser_DatabaseError() {
 		ChainId:   "eip155:1",
 	}
 
-	dbError := domain.NewDatabaseError("connection_failed", assert.AnError)
+	dbError := assert.AnError
 	suite.mockService.On("EnsureUser", ctx, req.AccountId, req.Address, req.ChainId).
-		Return((*domain.EnsureUserResult)(nil), dbError)
+		Return(domain.UserID(""), false, dbError)
 
 	resp, err := suite.handler.EnsureUser(ctx, req)
 
@@ -188,7 +202,7 @@ func (suite *UserGRPCTestSuite) TestEnsureUser_DatabaseError() {
 	st, ok := status.FromError(err)
 	suite.True(ok)
 	suite.Equal(codes.Internal, st.Code())
-	suite.Contains(st.Message(), "database_operation_failed")
+	suite.Contains(st.Message(), "general error")
 	suite.mockService.AssertExpectations(suite.T())
 }
 
@@ -199,7 +213,8 @@ func TestUserGRPCTestSuite(t *testing.T) {
 // Additional unit tests for edge cases
 func TestGRPCValidation(t *testing.T) {
 	mockService := new(MockUserService)
-	handler := grpcHandler.NewgRPCHandler(mockService)
+	server := grpc.NewServer()
+	handler := grpcHandler.NewgRPCHandler(server, mockService)
 	ctx := context.Background()
 
 	t.Run("ValidRequest", func(t *testing.T) {
@@ -209,19 +224,17 @@ func TestGRPCValidation(t *testing.T) {
 			ChainId:   "eip155:1",
 		}
 
-		expectedResult := &domain.EnsureUserResult{
-			UserID:  "user-123",
-			Created: true,
-		}
+		expectedUserID := domain.UserID("user-123")
+		expectedCreated := true
 
 		mockService.On("EnsureUser", ctx, req.AccountId, req.Address, req.ChainId).
-			Return(expectedResult, nil).Once()
+			Return(expectedUserID, expectedCreated, nil).Once()
 
 		resp, err := handler.EnsureUser(ctx, req)
 		assert.NoError(t, err)
 		assert.NotNil(t, resp)
-		assert.Equal(t, expectedResult.UserID, resp.UserId)
-		assert.Equal(t, expectedResult.Created, resp.Created)
+		assert.Equal(t, string(expectedUserID), resp.UserId)
+		assert.Equal(t, expectedCreated, resp.Created)
 	})
 
 	t.Run("WhitespaceOnlyFields", func(t *testing.T) {
@@ -234,7 +247,7 @@ func TestGRPCValidation(t *testing.T) {
 		// This should be handled by validation if implemented
 		// For now, we'll test that it reaches the service layer
 		mockService.On("EnsureUser", ctx, req.AccountId, req.Address, req.ChainId).
-			Return((*domain.EnsureUserResult)(nil), domain.ErrInvalidInput).Once()
+			Return(domain.UserID(""), false, domain.ErrInvalidAddress).Once()
 
 		resp, err := handler.EnsureUser(ctx, req)
 		assert.Error(t, err)
@@ -245,7 +258,8 @@ func TestGRPCValidation(t *testing.T) {
 // Benchmark tests for gRPC handlers
 func BenchmarkEnsureUser(b *testing.B) {
 	mockService := new(MockUserService)
-	handler := grpcHandler.NewgRPCHandler(mockService)
+	server := grpc.NewServer()
+	handler := grpcHandler.NewgRPCHandler(server, mockService)
 	ctx := context.Background()
 
 	req := &userpb.EnsureUserRequest{
@@ -254,13 +268,11 @@ func BenchmarkEnsureUser(b *testing.B) {
 		ChainId:   "eip155:1",
 	}
 
-	expectedResult := &domain.EnsureUserResult{
-		UserID:  "user-123",
-		Created: false,
-	}
+	expectedUserID := domain.UserID("user-123")
+	expectedCreated := false
 
 	mockService.On("EnsureUser", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(expectedResult, nil)
+		Return(expectedUserID, expectedCreated, nil)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -275,7 +287,8 @@ func TestEnsureUser_ConcurrentRequests(t *testing.T) {
 	}
 
 	mockService := new(MockUserService)
-	handler := grpcHandler.NewgRPCHandler(mockService)
+	server := grpc.NewServer()
+	handler := grpcHandler.NewgRPCHandler(server, mockService)
 	ctx := context.Background()
 
 	req := &userpb.EnsureUserRequest{
@@ -284,13 +297,11 @@ func TestEnsureUser_ConcurrentRequests(t *testing.T) {
 		ChainId:   "eip155:1",
 	}
 
-	expectedResult := &domain.EnsureUserResult{
-		UserID:  "user-123",
-		Created: false,
-	}
+	expectedUserID := domain.UserID("user-123")
+	expectedCreated := false
 
 	mockService.On("EnsureUser", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(expectedResult, nil)
+		Return(expectedUserID, expectedCreated, nil)
 
 	// Run concurrent requests
 	concurrency := 10
@@ -303,7 +314,7 @@ func TestEnsureUser_ConcurrentRequests(t *testing.T) {
 			resp, err := handler.EnsureUser(ctx, req)
 			assert.NoError(t, err)
 			assert.NotNil(t, resp)
-			assert.Equal(t, expectedResult.UserID, resp.UserId)
+			assert.Equal(t, string(expectedUserID), resp.UserId)
 		}()
 	}
 
@@ -323,21 +334,21 @@ func TestErrorMapping(t *testing.T) {
 	}{
 		{
 			name:         "invalid_input_error",
-			serviceError: domain.ErrInvalidInput,
-			expectedCode: codes.Internal,
-			expectedMsg:  "invalid_input",
+			serviceError: domain.ErrInvalidAddress,
+			expectedCode: codes.InvalidArgument,
+			expectedMsg:  "invalid address",
 		},
 		{
 			name:         "invalid_address_error",
 			serviceError: domain.ErrInvalidAddress,
-			expectedCode: codes.Internal,
-			expectedMsg:  "invalid_address",
+			expectedCode: codes.InvalidArgument,
+			expectedMsg:  "invalid address",
 		},
 		{
 			name:         "database_error",
-			serviceError: domain.NewDatabaseError("connection_failed", assert.AnError),
+			serviceError: domain.ErrUserNotFound,
 			expectedCode: codes.Internal,
-			expectedMsg:  "database_operation_failed",
+			expectedMsg:  "user not found",
 		},
 		{
 			name:         "generic_error",
@@ -350,7 +361,8 @@ func TestErrorMapping(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockService := new(MockUserService)
-			handler := grpcHandler.NewgRPCHandler(mockService)
+			server := grpc.NewServer()
+			handler := grpcHandler.NewgRPCHandler(server, mockService)
 			ctx := context.Background()
 
 			req := &userpb.EnsureUserRequest{
@@ -360,7 +372,7 @@ func TestErrorMapping(t *testing.T) {
 			}
 
 			mockService.On("EnsureUser", ctx, req.AccountId, req.Address, req.ChainId).
-				Return((*domain.EnsureUserResult)(nil), tc.serviceError)
+				Return(domain.UserID(""), false, tc.serviceError)
 
 			resp, err := handler.EnsureUser(ctx, req)
 
