@@ -3,68 +3,40 @@ package events
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"time"
+	"log"
 
 	"github.com/quangdang46/NFT-Marketplace/services/wallet-service/internal/domain"
 	"github.com/quangdang46/NFT-Marketplace/shared/contracts"
+	"github.com/quangdang46/NFT-Marketplace/shared/messaging"
 )
 
 type EventPublisher struct {
-	amqp contracts.AMQPClient
+	rabbitmq *messaging.RabbitMQ
 }
 
-func NewEventPublisher(amqp contracts.AMQPClient) *EventPublisher {
+func NewEventPublisher(rabbitmq *messaging.RabbitMQ) domain.WalletEventPublisher {
 	return &EventPublisher{
-		amqp: amqp,
+		rabbitmq: rabbitmq,
 	}
 }
 
-// PublishWalletLinked publishes a wallet linked event
 func (p *EventPublisher) PublishWalletLinked(ctx context.Context, event *domain.WalletLinkedEvent) error {
-	// Skip publishing if AMQP is not available
-	if p.amqp == nil {
-		fmt.Printf("AMQP not available, skipping wallet linked event: %+v\n", event)
-		return nil
-	}
-
-	// Create the message payload
-	payload := domain.WalletLinkedEvent{
-		UserID:    event.UserID,
-		AccountID: event.AccountID,
-		WalletID:  event.WalletID,
-		Address:   event.Address,
-		ChainID:   event.ChainID,
-		IsPrimary: event.IsPrimary,
-		LinkedAt:  event.LinkedAt,
-	}
-
-	body, err := json.Marshal(payload)
+	body, err := json.Marshal(event)
 	if err != nil {
-		return fmt.Errorf("failed to marshal wallet linked event: %w", err)
+		return err
 	}
 
-	// Publish to wallets.events exchange with routing key "wallet.linked"
-	if err := p.amqp.Publish(ctx, contracts.AMQPMessage{
+	message := contracts.AMQPMessage{
 		Exchange:   contracts.WalletsExchange,
 		RoutingKey: contracts.WalletLinkedKey,
 		Body:       body,
-		Headers: map[string]interface{}{
-			"event_type":   "wallet.linked",
-			"schema":       "wallet.linked.v1",
-			"published_at": time.Now().Format(time.RFC3339),
-			"service":      "wallet-service",
-		},
-	}); err != nil {
-		return fmt.Errorf("failed to publish wallet linked event: %w", err)
 	}
+
+	if err := p.rabbitmq.Publish(ctx, message); err != nil {
+		log.Printf("Failed to publish wallet.linked event: %v", err)
+		return err
+	}
+
+	log.Printf("Published wallet.linked event for user %s, wallet %s", event.UserID, event.WalletID)
 	return nil
 }
-
-// generateEventID generates a unique event ID
-func generateEventID() string {
-	return fmt.Sprintf("wallet_%d", time.Now().UnixNano())
-}
-
-// GenerateEventID exposes event ID generation for testing
-func GenerateEventID() string { return generateEventID() }

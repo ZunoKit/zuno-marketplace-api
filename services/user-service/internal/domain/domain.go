@@ -6,16 +6,21 @@ import (
 )
 
 type UserID = string
-type AccountID = string // wallet account ID
-type Address = string   // ethereum address
-type ChainID = string   // CAIP-2
 
-// User represents the core user entity
 type User struct {
 	ID        UserID
-	Status    string // active, suspended, etc.
+	Status    UserStatus
 	CreatedAt time.Time
+	UpdatedAt time.Time
 }
+
+type UserStatus string
+
+const (
+	UserStatusActive  UserStatus = "active"
+	UserStatusBanned  UserStatus = "banned"
+	UserStatusDeleted UserStatus = "deleted"
+)
 
 type Profile struct {
 	UserID      UserID
@@ -26,70 +31,35 @@ type Profile struct {
 	Bio         string
 	Locale      string
 	Timezone    string
-	SocialsJSON string // JSON string containing social media links
+	SocialsJSON string
 	UpdatedAt   time.Time
 }
 
-type EnsureUserResult struct {
-	UserID  UserID
-	Created bool // true if new user was created
+type UserCreatedEvent struct {
+	UserID    UserID
+	AccountID string
+	Address   string
+	ChainID   string
+	CreatedAt time.Time
 }
 
 type UserService interface {
-	EnsureUser(ctx context.Context, accountID AccountID, address Address, chainID ChainID) (*EnsureUserResult, error)
+	EnsureUser(ctx context.Context, accountID, address, chainID string) (UserID, bool, error)
+	GetUser(ctx context.Context, userID UserID) (*User, *Profile, error)
+	UpdateProfile(ctx context.Context, profile *Profile) (*Profile, error)
 }
 
 type UserRepository interface {
-	GetUserIDByAccount(ctx context.Context, accountID string) (string, error)
+	CreateUser(ctx context.Context, user *User) error
+	GetUser(ctx context.Context, userID UserID) (*User, error)
+	GetUserByAddress(ctx context.Context, address string) (*User, error)
+	UpdateUser(ctx context.Context, user *User) error
 
-	WithTx(ctx context.Context, fn func(TxUserRepository) error) error
+	CreateProfile(ctx context.Context, profile *Profile) error
+	GetProfile(ctx context.Context, userID UserID) (*Profile, error)
+	UpdateProfile(ctx context.Context, profile *Profile) error
 }
 
-type TxUserRepository interface {
-	AcquireAccountLock(ctx context.Context, accountID string) error
-	GetUserIDByAccountTx(ctx context.Context, accountID string) (string, error)
-
-	CreateUserTx(ctx context.Context) (string, error)
-	CreateProfileTx(ctx context.Context, userID string) error
-
-	UpsertUserAccountTx(ctx context.Context, userID, accountID, address, chainID string) error
-	TouchUserAccountTx(ctx context.Context, accountID, address string) error
-}
-
-// Validation helpers
-func ValidateAccountID(accountID AccountID) error {
-	if accountID == "" {
-		return NewInvalidInputError("account_id", "cannot be empty")
-	}
-	if len(accountID) > 255 {
-		return NewInvalidInputError("account_id", "too long")
-	}
-	return nil
-}
-
-func ValidateAddress(address Address) error {
-	if address == "" {
-		return NewInvalidInputError("address", "cannot be empty")
-	}
-	if len(address) != 42 {
-		return NewInvalidInputError("address", "must be 42 characters long")
-	}
-	if address[:2] != "0x" {
-		return NewInvalidInputError("address", "must start with 0x")
-	}
-	// Check if the rest are hex characters
-	for i := 2; i < len(address); i++ {
-		c := address[i]
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
-			return NewInvalidInputError("address", "contains invalid hex characters")
-		}
-	}
-	return nil
-}
-
-func ValidateChainID(chainID ChainID) error {
-	if chainID == "" {
-		return NewInvalidInputError("chain_id", "cannot be empty")
-	}
-	return nil
+type UserEventPublisher interface {
+	PublishUserCreated(ctx context.Context, event *UserCreatedEvent) error
 }

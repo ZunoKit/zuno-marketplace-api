@@ -91,11 +91,11 @@ func (suite *AuthServiceTestSuite) TestGetNonce_Success() {
 	ctx := context.Background()
 	accountID := "0x1234567890123456789012345678901234567890"
 	chainID := "eip155:1"
-	domain := "localhost"
+	domainName := "localhost"
 
 	suite.mockRepo.On("CreateNonce", ctx, mock.AnythingOfType("*domain.Nonce")).Return(nil)
 
-	nonce, err := suite.authService.GetNonce(ctx, accountID, chainID, domain)
+	nonce, err := suite.authService.GetNonce(ctx, accountID, chainID, domainName)
 
 	suite.NoError(err)
 	suite.NotEmpty(nonce)
