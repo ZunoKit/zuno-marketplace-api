@@ -1,6 +1,10 @@
-# Authentication Flow - SIWE Implementation
+# 1. SIWE Sign-In Flow
 
-## Authentication Sequence
+## Overview
+
+This document describes the complete Sign-In with Ethereum (SIWE) flow, including nonce generation, signature verification, and session creation.
+
+## Sequence Diagram
 
 ```mermaid
 sequenceDiagram
@@ -53,11 +57,41 @@ sequenceDiagram
   WALLET->>PGW: INSERT ... ON CONFLICT DO NOTHING
 
   AUTH-->>GQL: {accessToken, refreshToken, userId, expiresAt}
-  GQL-->>FE: session established
+
+  Note over GQL: Set-Cookie refresh_token with HttpOnly Secure SameSite=Strict Path=/ Max-Age=30d
+  GQL-->>FE: {accessToken, refreshToken, userId, expiresAt}  # refreshToken cũng trả về trong body
 
   AUTH->>MQ: publish auth.user_logged_in {...}
   WALLET->>MQ: publish wallet.linked {...}
 ```
+
+## Key Components
+
+### SIWE Message Format
+```
+app.zuno.com wants you to sign in with your Ethereum account:
+0x1234567890123456789012345678901234567890
+
+I accept the Terms of Service: https://app.zuno.com/tos
+
+URI: https://app.zuno.com
+Version: 1
+Chain ID: 1
+Nonce: 32AlphaNumericChars
+Issued At: 2024-01-01T12:00:00.000Z
+```
+
+### Nonce Generation
+- **Format**: 32 character alphanumeric string
+- **TTL**: 5 minutes (300 seconds)
+- **Single Use**: Marked as used after verification
+- **Storage**: Both PostgreSQL and Redis for reliability
+
+### Signature Verification
+- **EOA**: Standard ECDSA signature recovery
+- **Smart Contracts**: EIP-1271 signature validation
+- **Domain Binding**: Prevents signature replay attacks
+- **Nonce Validation**: Ensures freshness and single use
 
 ## GraphQL Schema
 
@@ -73,7 +107,7 @@ type NoncePayload {
 
 type AuthPayload {
   accessToken: String!
-  refreshToken: String! # hoặc bỏ khỏi body và set cookie httpOnly
+  refreshToken: String!
   expiresAt: DateTime!
   userId: ID!
 }
@@ -96,51 +130,22 @@ type Mutation {
 }
 ```
 
-## gRPC Services
+## Security Features
 
-### Auth Service
+### Nonce Protection
+- Cryptographically secure random generation
+- One-time use prevents replay attacks
+- Short TTL limits attack window
+- Database tracking for audit trails
 
-```proto
-syntax = "proto3";
-package auth.v1;
-option go_package = "github.com/yourorg/packages/proto-gen-go/auth/v1;authv1";
+### Session Security
+- HttpOnly cookies prevent XSS access
+- Secure flag for HTTPS-only transmission
+- SameSite=Strict prevents CSRF
+- 30-day refresh token rotation
 
-message GetNonceRequest { string account_id = 1; string chain_id = 2; string domain = 3; }
-message GetNonceResponse { string nonce = 1; }
-
-message VerifySiweRequest { string account_id = 1; string message = 2; string signature = 3; }
-message VerifySiweResponse {
-  string access_token  = 1;
-  string refresh_token = 2;
-  string expires_at    = 3;
-  string user_id       = 4;
-  string address       = 5;
-  string chain_id      = 6;
-}
-
-service Auth {
-  rpc GetNonce(GetNonceRequest) returns (GetNonceResponse);
-  rpc VerifySiwe(VerifySiweRequest) returns (VerifySiweResponse);
-}
-```
-
-### Wallet Service
-
-```proto
-syntax = "proto3";
-package wallets.v1;
-option go_package = "github.com/yourorg/packages/proto-gen-go/wallets/v1;walletsv1";
-
-message UpsertLinkRequest {
-  string user_id   = 1;
-  string account_id= 2;
-  string address   = 3; // lowercase 0x…
-  string chain_id  = 4; // CAIP-2
-  bool   is_primary= 5;
-}
-message UpsertLinkResponse {}
-
-service Wallets {
-  rpc UpsertLink (UpsertLinkRequest) returns (UpsertLinkResponse);
-}
-```
+### Wallet Linking
+- Idempotent operations prevent duplicates
+- Primary wallet designation
+- Multi-chain address support
+- Automatic profile creation
