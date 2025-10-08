@@ -68,6 +68,28 @@ extend type Mutation {
   trackTx(input: TrackTxInput!): Boolean! # true = ok
 }
 
+type MintStatus {
+  intentId: ID!
+  status: IntentStatus!
+  contract: Address
+  tokenIds: [String!]
+  txHash: Hex
+  chainId: ChainId
+  error: String
+  metadata: JSON
+}
+
+type CollectionStatus {
+  intentId: ID!
+  status: String!
+  contractAddress: Address
+  txHash: Hex
+  chainId: ChainId
+  error: String
+}
+
 type Subscription {
   onIntentStatus(intentId: ID!): IntentStatusPayload!
+  onMintStatus(intentId: ID!): MintStatus!
+  onCollectionStatus(intentId: ID!): CollectionStatus!
 }
