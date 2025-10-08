@@ -1,5 +1,10 @@
 # System Architecture Overview
 
+## Documentation Index
+
+- [Database Schema](./database-schema.md) - Detailed database schema documentation
+- [Database Diagrams](./database-diagram.md) - Visual database architecture with Mermaid diagrams
+
 ## Microservices Architecture
 
 ```mermaid

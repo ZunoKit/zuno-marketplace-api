@@ -10,6 +10,7 @@ RUN --mount=type=cache,target=/go/pkg/mod go mod download
 
 # Copy only required source
 COPY shared ./shared
+COPY proto ./proto
 COPY services/catalog-service ./services/catalog-service
 
 # Build the binary

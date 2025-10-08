@@ -11,19 +11,22 @@ RUN --mount=type=cache,target=/go/pkg/mod go mod download
 # Copy only required source
 COPY shared ./shared
 COPY proto ./proto
-COPY services/indexer-service ./services/indexer-service
+COPY services/subscription-worker ./services/subscription-worker
 
 # Build the binary
 ARG CGO_ENABLED=0
 ARG GOOS=linux
 ARG GOARCH=amd64
 RUN --mount=type=cache,target=/root/.cache/go-build \
-    go build -o build/indexer-service ./services/indexer-service/cmd/main.go
+    go build -o build/subscription-worker ./services/subscription-worker/cmd/main.go
 
 # Final stage
 FROM alpine:latest
 
 WORKDIR /app
+
+# Install dependencies
+RUN apk --no-cache add ca-certificates
 
 # Copy shared folder
 COPY shared ./shared
@@ -32,6 +35,6 @@ COPY shared ./shared
 COPY --from=builder /app/build ./build
 
 # Make binary executable
-RUN chmod +x /app/build/indexer-service
+RUN chmod +x /app/build/subscription-worker
 
-ENTRYPOINT ["/app/build/indexer-service"]
+ENTRYPOINT ["/app/build/subscription-worker"]

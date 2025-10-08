@@ -4,11 +4,11 @@ services:
     image: postgres:15-alpine
     container_name: nft-postgres
     environment:
-      POSTGRES_DB: nft_marketplace
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DATABASE}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./services/auth-service/db/up.sql:/docker-entrypoint-initdb.d/01-auth-schema.sql
@@ -25,7 +25,7 @@ services:
     image: redis:7-alpine
     container_name: nft-redis
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT}:6379"
     networks:
       - nft-network
 
@@ -33,10 +33,10 @@ services:
     image: rabbitmq:3-management-alpine
     container_name: nft-rabbitmq
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
     ports:
-      - "5672:5672"
+      - "${RABBITMQ_PORT}:5672"
       - "15672:15672"
     networks:
       - nft-network
@@ -45,7 +45,7 @@ services:
     image: mongo:6
     container_name: nft-mongo
     environment:
-      MONGO_INITDB_DATABASE: nft_marketplace
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
     ports:
       - "27017:27017"
     volumes:
@@ -66,24 +66,25 @@ services:
     env_file:
       - .env
     environment:
-      - AUTH_GRPC_PORT=:50051
-      - USER_SERVICE_URL=user-service:50052
-      - WALLET_SERVICE_URL=wallet-service:50053
+      - AUTH_GRPC_PORT=:${AUTH_GRPC_PORT}
+      - USER_SERVICE_URL=user-service:${USER_GRPC_PORT}
+      - WALLET_SERVICE_URL=wallet-service:${WALLET_GRPC_PORT}
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DATABASE=nft_marketplace
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DATABASE=${POSTGRES_DATABASE}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672
-      - RABBITMQ_USER=guest
-      - RABBITMQ_PASSWORD=guest
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - RABBITMQ_EXCHANGE=${RABBITMQ_EXCHANGE}
       - JWT_SECRET=${JWT_SECRET}
       - REFRESH_SECRET=${REFRESH_SECRET}
     ports:
-      - "50051:50051"
+      - "${AUTH_GRPC_PORT}:${AUTH_GRPC_PORT}"
 
     depends_on:
       - postgres
@@ -114,20 +115,21 @@ services:
       dockerfile: infra/development/docker/user-service.Dockerfile
     container_name: nft-user-service
     environment:
-      - USER_GRPC_PORT=:50052
+      - USER_GRPC_PORT=:${USER_GRPC_PORT}
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DATABASE=nft_marketplace
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DATABASE=${POSTGRES_DATABASE}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672
-      - RABBITMQ_USER=guest
-      - RABBITMQ_PASSWORD=guest
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - RABBITMQ_EXCHANGE=${RABBITMQ_EXCHANGE}
     ports:
-      - "50052:50052"
+      - "${USER_GRPC_PORT}:${USER_GRPC_PORT}"
     # volumes removed; using compose watch instead
     depends_on:
       - postgres
@@ -158,20 +160,21 @@ services:
       dockerfile: infra/development/docker/wallet-service.Dockerfile
     container_name: nft-wallet-service
     environment:
-      - WALLET_GRPC_PORT=:50053
+      - WALLET_GRPC_PORT=:${WALLET_GRPC_PORT}
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DATABASE=nft_marketplace
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DATABASE=${POSTGRES_DATABASE}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672
-      - RABBITMQ_USER=guest
-      - RABBITMQ_PASSWORD=guest
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - RABBITMQ_EXCHANGE=${RABBITMQ_EXCHANGE}
     ports:
-      - "50053:50053"
+      - "${WALLET_GRPC_PORT}:${WALLET_GRPC_PORT}"
     # volumes removed; using compose watch instead
     depends_on:
       - postgres
@@ -202,21 +205,22 @@ services:
       dockerfile: infra/development/docker/orchestrator-service.Dockerfile
     container_name: nft-orchestrator-service
     environment:
-      - ORCHESTRATOR_GRPC_PORT=:50054
-      - CHAIN_REGISTRY_URL=chain-registry-service:50056
+      - ORCHESTRATOR_GRPC_PORT=:${ORCHESTRATOR_GRPC_PORT}
+      - CHAIN_REGISTRY_URL=chain-registry-service:${CHAIN_REGISTRY_GRPC_PORT}
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DATABASE=nft_marketplace
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DATABASE=${POSTGRES_DATABASE}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672
-      - RABBITMQ_USER=guest
-      - RABBITMQ_PASSWORD=guest
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - RABBITMQ_EXCHANGE=${RABBITMQ_EXCHANGE}
     ports:
-      - "50054:50054"
+      - "${ORCHESTRATOR_GRPC_PORT}:${ORCHESTRATOR_GRPC_PORT}"
     # volumes removed; using compose watch instead
     depends_on:
       - postgres
@@ -251,26 +255,21 @@ services:
     env_file:
       - .env
     environment:
-      - MEDIA_GRPC_PORT=:50055
-
-      
+      - MEDIA_GRPC_PORT=:${MEDIA_GRPC_PORT}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672
-      - RABBITMQ_USER=guest
-      - RABBITMQ_PASSWORD=guest
-      
-      - MONGO_URI=mongodb://mongo:27017
-      - MONGO_DATABASE=nft_marketplace
-      - PINATA_BASE_URL=https://api.pinata.cloud
-      - PINATA_GATEWAY_URL=https://gateway.pinata.cloud
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - RABBITMQ_EXCHANGE=${RABBITMQ_EXCHANGE}
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DATABASE=${MONGO_DATABASE}
       - PINATA_API_KEY=${PINATA_API_KEY}
       - PINATA_SECRET_KEY=${PINATA_SECRET_KEY}
       - PINATA_JWT_KEY=${PINATA_JWT_KEY}
     ports:
-      - "50055:50055"
+      - "${MEDIA_GRPC_PORT}:${MEDIA_GRPC_PORT}"
 
     depends_on:
       - mongo
@@ -302,20 +301,21 @@ services:
       dockerfile: infra/development/docker/chain-registry-service.Dockerfile
     container_name: nft-chain-registry-service
     environment:
-      - CHAIN_REGISTRY_GRPC_PORT=:50056
+      - CHAIN_REGISTRY_GRPC_PORT=:${CHAIN_REGISTRY_GRPC_PORT}
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DATABASE=nft_marketplace
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DATABASE=${POSTGRES_DATABASE}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672
-      - RABBITMQ_USER=guest
-      - RABBITMQ_PASSWORD=guest
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - RABBITMQ_EXCHANGE=${RABBITMQ_EXCHANGE}
     ports:
-      - "50056:50056"
+      - "${CHAIN_REGISTRY_GRPC_PORT}:${CHAIN_REGISTRY_GRPC_PORT}"
     # volumes removed; using compose watch instead
     depends_on:
       - postgres
@@ -346,23 +346,21 @@ services:
       dockerfile: infra/development/docker/catalog-service.Dockerfile
     container_name: nft-catalog-service
     environment:
-      - CATALOG_GRPC_PORT=:50057
-
+      - CATALOG_GRPC_PORT=:${CATALOG_GRPC_PORT}
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DATABASE=nft_marketplace
-
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DATABASE=${POSTGRES_DATABASE}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672
-      - RABBITMQ_USER=guest
-      - RABBITMQ_PASSWORD=guest
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - RABBITMQ_EXCHANGE=${RABBITMQ_EXCHANGE}
     ports:
-      - "50057:50057"
+      - "${CATALOG_GRPC_PORT}:${CATALOG_GRPC_PORT}"
     depends_on:
       - postgres
       - redis
@@ -392,25 +390,21 @@ services:
       dockerfile: infra/development/docker/indexer-service.Dockerfile
     container_name: nft-indexer-service
     environment:
-      - INDEXER_GRPC_PORT=:50058
+      - INDEXER_GRPC_PORT=:${INDEXER_GRPC_PORT}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672
-      - RABBITMQ_USER=guest
-      - RABBITMQ_PASSWORD=guest
-
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - RABBITMQ_EXCHANGE=${RABBITMQ_EXCHANGE}
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DATABASE=nft_marketplace
-
-      - MONGO_URI=mongodb://mongo:27017
-      - MONGO_DATABASE=nft_marketplace
-
-      - RABBITMQ_EXCHANGE=nft-marketplace
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DATABASE=${POSTGRES_DATABASE}
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DATABASE=${MONGO_DATABASE}
       - ETH_SEPOLIA_RPC=${ETH_SEPOLIA_RPC}
       - ANVIL_RPC=${ANVIL_RPC}
     depends_on:
@@ -446,21 +440,22 @@ services:
       dockerfile: infra/development/docker/graph-gateway.Dockerfile
     container_name: nft-graphql-gateway
     environment:
-      - GATEWAY_HTTP_ADDR=:8081
-      - AUTH_SERVICE_URL=auth-service:50051
-      - USER_SERVICE_URL=user-service:50052
-      - WALLET_SERVICE_URL=wallet-service:50053
-      - MEDIA_SERVICE_URL=media-service:50055
-      - CHAIN_REGISTRY_SERVICE_URL=chain-registry-service:50056
-      - ORCHESTRATOR_SERVICE_URL=orchestrator-service:50054
-      - CATALOG_SERVICE_URL=catalog-service:50057
-      - INDEXER_SERVICE_URL=indexer-service:50058
+      - GATEWAY_HTTP_ADDR=:${GATEWAY_HTTP_ADDR}
+      - AUTH_SERVICE_URL=auth-service:${AUTH_GRPC_PORT}
+      - USER_SERVICE_URL=user-service:${USER_GRPC_PORT}
+      - WALLET_SERVICE_URL=wallet-service:${WALLET_GRPC_PORT}
+      - MEDIA_SERVICE_URL=media-service:${MEDIA_GRPC_PORT}
+      - CHAIN_REGISTRY_SERVICE_URL=chain-registry-service:${CHAIN_REGISTRY_GRPC_PORT}
+      - ORCHESTRATOR_SERVICE_URL=orchestrator-service:${ORCHESTRATOR_GRPC_PORT}
+      - CATALOG_SERVICE_URL=catalog-service:${CATALOG_GRPC_PORT}
+      - INDEXER_SERVICE_URL=indexer-service:${INDEXER_GRPC_PORT}
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672
-      - RABBITMQ_USER=guest
-      - RABBITMQ_PASSWORD=guest
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - RABBITMQ_EXCHANGE=${RABBITMQ_EXCHANGE}
     ports:
-      - "8081:8081"
+      - "${GATEWAY_HTTP_ADDR}:${GATEWAY_HTTP_ADDR}"
     # volumes removed; using compose watch instead
     depends_on:
       - auth-service
@@ -488,6 +483,46 @@ services:
           action: sync
         - path: .
           action: rebuild
+
+  subscription-worker:
+    build:
+      context: .
+      dockerfile: infra/development/docker/subscription-worker.Dockerfile
+      args:
+        - CGO_ENABLED=0
+        - GOOS=linux
+        - GOARCH=amd64
+    container_name: nft-subscription-worker
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DATABASE=${POSTGRES_DATABASE}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - RABBITMQ_EXCHANGE=${RABBITMQ_EXCHANGE}
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+      - graphql-gateway
+    networks:
+      - nft-network
+    develop:
+      watch:
+        - path: ./shared
+          target: /app/shared
+          action: sync
+        - path: ./services/subscription-worker
+          target: /app/services/subscription-worker
+          action: sync
 
 volumes:
   postgres_data:
