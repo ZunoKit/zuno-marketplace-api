@@ -3,11 +3,15 @@ package graphql_resolver
 import (
 	"context"
 	"fmt"
+	"io"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/quangdang46/NFT-Marketplace/services/graphql-gateway/graphql/schemas"
 	"github.com/quangdang46/NFT-Marketplace/services/graphql-gateway/middleware"
+	"github.com/quangdang46/NFT-Marketplace/services/graphql-gateway/utils"
 	authpb "github.com/quangdang46/NFT-Marketplace/shared/proto/auth"
 	chainregpb "github.com/quangdang46/NFT-Marketplace/shared/proto/chainregistry"
+	"github.com/quangdang46/NFT-Marketplace/shared/proto/media"
 )
 
 type MutationResolver struct {
@@ -174,4 +178,37 @@ func (r *MutationResolver) BumpChainVersion(ctx context.Context, input schemas.B
 		return nil, err
 	}
 	return &schemas.BumpChainVersionPayload{Ok: resp.GetOk(), NewVersion: resp.GetNewVersion()}, nil
+}
+
+// UploadMedia uploads multiple media files
+func (r *MutationResolver) UploadMedia(ctx context.Context, files []*graphql.Upload) ([]*schemas.MediaAsset, error) {
+	if r.server.mediaClient == nil || r.server.mediaClient.Client == nil {
+		return nil, fmt.Errorf("media service unavailable")
+	}
+
+	var assets []*schemas.MediaAsset
+	for _, file := range files {
+		fileData, err := io.ReadAll(file.File)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read file %s: %w", file.Filename, err)
+		}
+
+		req := &media.SingleUploadRequest{
+			FileData: fileData,
+			Filename: file.Filename,
+			Mime:     file.ContentType,
+			Kind:     media.MediaKind_IMAGE, // Default to image
+		}
+
+		client := *r.server.mediaClient.Client
+		resp, err := client.UploadSingleFile(ctx, req)
+		if err != nil {
+			return nil, fmt.Errorf("failed to upload file %s: %w", file.Filename, err)
+		}
+
+		asset := utils.MapAssetToGraphQL(resp.Asset)
+		assets = append(assets, asset)
+	}
+
+	return assets, nil
 }

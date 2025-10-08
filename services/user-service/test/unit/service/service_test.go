@@ -101,6 +101,9 @@ func (suite *UserServiceTestSuite) TestEnsureUser_CreateNew() {
 	// Mock create profile
 	suite.mockRepo.On("CreateProfile", ctx, mock.AnythingOfType("*domain.Profile")).Return(nil)
 
+	// Mock publish event
+	suite.mockPublisher.On("PublishUserCreated", mock.Anything, mock.AnythingOfType("*domain.UserCreatedEvent")).Return(nil)
+
 	// Act
 	userID, created, err := suite.userService.EnsureUser(ctx, accountID, address, chainID)
 

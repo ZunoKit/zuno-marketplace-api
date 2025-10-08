@@ -134,29 +134,29 @@ func (s *Service) UploadMedia(ctx context.Context, files []io.Reader, metas []do
 
 	for i, file := range files {
 		meta := metas[i]
-		
+
 		// Sanitize filename
 		meta.Filename = utils.SanitizeFilename(meta.Filename)
-		
+
 		// Validate file type
 		if err := utils.ValidateFileType(meta.Filename, meta.Mime); err != nil {
 			return nil, fmt.Errorf("invalid file type for file %d: %w", i, err)
 		}
-		
+
 		// Get media type for validation
 		mediaType := utils.GetMediaType(meta.Mime)
-		
+
 		// Read content for processing
 		content, err := io.ReadAll(file)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read file %d: %w", i, err)
 		}
-		
+
 		// Validate file size
 		if err := utils.ValidateFileSize(int64(len(content)), mediaType); err != nil {
 			return nil, fmt.Errorf("file %d size validation failed: %w", i, err)
 		}
-		
+
 		// Validate image dimensions if applicable
 		if utils.IsImageMimeType(meta.Mime) && meta.Width != nil && meta.Height != nil {
 			if err := utils.ValidateImageDimensions(*meta.Width, *meta.Height); err != nil {
@@ -222,8 +222,8 @@ func (s *Service) UploadMedia(ctx context.Context, files []io.Reader, metas []do
 				{
 					ID:     "original",
 					CDNURL: cdnURL,
-					Width:  uint32(meta.Width != nil ? *meta.Width : 0),
-					Height: uint32(meta.Height != nil ? *meta.Height : 0),
+					Width:  getWidth(meta),
+					Height: getHeight(meta),
 					Format: getFormatFromMime(meta.Mime),
 				},
 			}
@@ -232,7 +232,7 @@ func (s *Service) UploadMedia(ctx context.Context, files []io.Reader, metas []do
 		// Pin to IPFS asynchronously
 		go func(asset *domain.AssetDoc, content []byte, filename string) {
 			ctx := context.Background() // Use new context for async operation
-			
+
 			contentReader := bytes.NewReader(content)
 			pinResult, err := s.pinner.PinFile(ctx, contentReader, filename)
 			if err != nil {
@@ -278,4 +278,20 @@ func getFormatFromMime(mime string) string {
 		}
 		return "UNKNOWN"
 	}
+}
+
+// getWidth returns the width from upload meta
+func getWidth(meta domain.UploadMeta) uint32 {
+	if meta.Width != nil {
+		return *meta.Width
+	}
+	return 0
+}
+
+// getHeight returns the height from upload meta
+func getHeight(meta domain.UploadMeta) uint32 {
+	if meta.Height != nil {
+		return *meta.Height
+	}
+	return 0
 }

@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/quangdang46/NFT-Marketplace/services/graphql-gateway/graphql/schemas"
 	"github.com/quangdang46/NFT-Marketplace/services/graphql-gateway/middleware"
+	"github.com/quangdang46/NFT-Marketplace/services/graphql-gateway/websocket"
 )
 
 // SubscriptionResolver handles GraphQL subscriptions
@@ -18,15 +20,11 @@ type SubscriptionResolver struct {
 func (r *SubscriptionResolver) OnMintStatus(ctx context.Context, intentID string) (<-chan *schemas.MintStatus, error) {
 	// Validate intent ID
 	if intentID == "" {
-		return nil, fmt.Errorf("intent ID is required")
+		return nil, fmt.Errorf("invalid intent ID: cannot be empty")
 	}
 
 	// Get current user for authorization (optional)
-	user := middleware.GetCurrentUser(ctx)
-	subscriberID := "anonymous"
-	if user != nil {
-		subscriberID = user.UserID
-	}
+	_ = middleware.GetCurrentUser(ctx)
 
 	// Create channel for status updates
 	statusChan := make(chan *schemas.MintStatus, 1)
@@ -38,44 +36,29 @@ func (r *SubscriptionResolver) OnMintStatus(ctx context.Context, intentID string
 	}
 
 	// Subscribe to intent updates
-	subscription, err := r.server.websocketClient.Subscribe(ctx, intentID, subscriberID)
+	err := r.server.websocketClient.Subscribe(intentID, func(id string, data *websocket.IntentStatusData) error {
+		// Convert IntentStatusData to MintStatus
+		status := &schemas.MintStatus{
+			IntentID: id,
+			Status:   mapWebSocketStatusToSchema(data.Status),
+		}
+		select {
+		case statusChan <- status:
+		case <-ctx.Done():
+			return fmt.Errorf("context cancelled")
+		}
+		return nil
+	})
 	if err != nil {
 		close(statusChan)
 		return nil, fmt.Errorf("failed to subscribe to intent %s: %w", intentID, err)
 	}
 
-	// Start goroutine to handle updates
+	// Start goroutine to handle context cancellation
 	go func() {
-		defer close(statusChan)
-		defer subscription.Close()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case msg, ok := <-subscription.Messages:
-				if !ok {
-					return // Subscription closed
-				}
-
-				// Convert message to MintStatus
-				status, err := r.parseMintStatus(msg)
-				if err != nil {
-					fmt.Printf("Error parsing mint status: %v\n", err)
-					continue
-				}
-
-				// Send status update
-				select {
-				case statusChan <- status:
-				case <-ctx.Done():
-					return
-				case <-time.After(5 * time.Second):
-					// Timeout sending to channel
-					fmt.Printf("Timeout sending status update for intent %s\n", intentID)
-				}
-			}
-		}
+		<-ctx.Done()
+		close(statusChan)
+		// TODO: Implement unsubscribe when context is cancelled
 	}()
 
 	// Send initial status immediately if available
@@ -96,15 +79,11 @@ func (r *SubscriptionResolver) OnMintStatus(ctx context.Context, intentID string
 func (r *SubscriptionResolver) OnCollectionStatus(ctx context.Context, intentID string) (<-chan *schemas.CollectionStatus, error) {
 	// Validate intent ID
 	if intentID == "" {
-		return nil, fmt.Errorf("intent ID is required")
+		return nil, fmt.Errorf("invalid intent ID: cannot be empty")
 	}
 
 	// Get current user for authorization
-	user := middleware.GetCurrentUser(ctx)
-	subscriberID := "anonymous"
-	if user != nil {
-		subscriberID = user.UserID
-	}
+	_ = middleware.GetCurrentUser(ctx)
 
 	// Create channel for status updates
 	statusChan := make(chan *schemas.CollectionStatus, 1)
@@ -116,43 +95,29 @@ func (r *SubscriptionResolver) OnCollectionStatus(ctx context.Context, intentID 
 	}
 
 	// Subscribe to intent updates
-	subscription, err := r.server.websocketClient.Subscribe(ctx, intentID, subscriberID)
+	err := r.server.websocketClient.Subscribe(intentID, func(id string, data *websocket.IntentStatusData) error {
+		// Convert IntentStatusData to CollectionStatus
+		status := &schemas.CollectionStatus{
+			IntentID: id,
+			Status:   data.Status, // Use string directly for CollectionStatus
+		}
+		select {
+		case statusChan <- status:
+		case <-ctx.Done():
+			return fmt.Errorf("context cancelled")
+		}
+		return nil
+	})
 	if err != nil {
 		close(statusChan)
 		return nil, fmt.Errorf("failed to subscribe to intent %s: %w", intentID, err)
 	}
 
-	// Start goroutine to handle updates
+	// Start goroutine to handle context cancellation
 	go func() {
-		defer close(statusChan)
-		defer subscription.Close()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case msg, ok := <-subscription.Messages:
-				if !ok {
-					return
-				}
-
-				// Convert message to CollectionStatus
-				status, err := r.parseCollectionStatus(msg)
-				if err != nil {
-					fmt.Printf("Error parsing collection status: %v\n", err)
-					continue
-				}
-
-				// Send status update
-				select {
-				case statusChan <- status:
-				case <-ctx.Done():
-					return
-				case <-time.After(5 * time.Second):
-					fmt.Printf("Timeout sending status update for intent %s\n", intentID)
-				}
-			}
-		}
+		<-ctx.Done()
+		close(statusChan)
+		// TODO: Implement unsubscribe when context is cancelled
 	}()
 
 	return statusChan, nil
@@ -162,15 +127,11 @@ func (r *SubscriptionResolver) OnCollectionStatus(ctx context.Context, intentID 
 func (r *SubscriptionResolver) OnIntentStatus(ctx context.Context, intentID string) (<-chan *schemas.IntentStatusPayload, error) {
 	// Validate intent ID
 	if intentID == "" {
-		return nil, fmt.Errorf("intent ID is required")
+		return nil, fmt.Errorf("invalid intent ID: cannot be empty")
 	}
 
 	// Get current user
-	user := middleware.GetCurrentUser(ctx)
-	subscriberID := "anonymous"
-	if user != nil {
-		subscriberID = user.UserID
-	}
+	_ = middleware.GetCurrentUser(ctx)
 
 	// Create channel for status updates
 	statusChan := make(chan *schemas.IntentStatusPayload, 1)
@@ -182,43 +143,30 @@ func (r *SubscriptionResolver) OnIntentStatus(ctx context.Context, intentID stri
 	}
 
 	// Subscribe to intent updates
-	subscription, err := r.server.websocketClient.Subscribe(ctx, intentID, subscriberID)
+	err := r.server.websocketClient.Subscribe(intentID, func(id string, data *websocket.IntentStatusData) error {
+		// Convert IntentStatusData to IntentStatusPayload
+		status := &schemas.IntentStatusPayload{
+			IntentID: id,
+			Status:   mapWebSocketStatusToSchema(data.Status),
+			Kind:     "generic", // Default kind
+		}
+		select {
+		case statusChan <- status:
+		case <-ctx.Done():
+			return fmt.Errorf("context cancelled")
+		}
+		return nil
+	})
 	if err != nil {
 		close(statusChan)
 		return nil, fmt.Errorf("failed to subscribe to intent %s: %w", intentID, err)
 	}
 
-	// Start goroutine to handle updates
+	// Start goroutine to handle context cancellation
 	go func() {
-		defer close(statusChan)
-		defer subscription.Close()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case msg, ok := <-subscription.Messages:
-				if !ok {
-					return
-				}
-
-				// Convert message to IntentStatusPayload
-				status, err := r.parseIntentStatus(msg)
-				if err != nil {
-					fmt.Printf("Error parsing intent status: %v\n", err)
-					continue
-				}
-
-				// Send status update
-				select {
-				case statusChan <- status:
-				case <-ctx.Done():
-					return
-				case <-time.After(5 * time.Second):
-					fmt.Printf("Timeout sending status update for intent %s\n", intentID)
-				}
-			}
-		}
+		<-ctx.Done()
+		close(statusChan)
+		// TODO: Implement unsubscribe when context is cancelled
 	}()
 
 	// Send initial status
@@ -245,7 +193,7 @@ func (r *SubscriptionResolver) parseMintStatus(msg interface{}) (*schemas.MintSt
 	return &schemas.MintStatus{
 		Status:   schemas.IntentStatusPending,
 		IntentID: "placeholder",
-		ChainID:  schemas.ChainID("eip155:1"),
+		ChainID:  strPtr("eip155:1"),
 	}, nil
 }
 
@@ -283,7 +231,7 @@ func (r *SubscriptionResolver) getInitialMintStatus(ctx context.Context, intentI
 	return &schemas.MintStatus{
 		Status:   schemas.IntentStatusPending,
 		IntentID: intentID,
-		ChainID:  schemas.ChainID("eip155:1"),
+		ChainID:  strPtr("eip155:1"),
 	}, nil
 }
 
@@ -299,4 +247,54 @@ func (r *SubscriptionResolver) getInitialIntentStatus(ctx context.Context, inten
 		Kind:     "mint",
 		Status:   schemas.IntentStatusPending,
 	}, nil
+}
+
+// OnMediaPinned subscribes to media pinning status updates
+func (r *SubscriptionResolver) OnMediaPinned(ctx context.Context, assetID string) (<-chan *schemas.MediaAsset, error) {
+	ch := make(chan *schemas.MediaAsset, 1)
+
+	// TODO: Implement actual subscription to media service events
+	// For now, return a placeholder channel
+	go func() {
+		defer close(ch)
+		// Placeholder: send initial status
+		ch <- &schemas.MediaAsset{
+			ID:        assetID,
+			PinStatus: schemas.PinStatusPinning,
+			Kind:      schemas.MediaKindImage, // Default
+			Mime:      "image/jpeg",
+			Sha256:    "placeholder",
+			CreatedAt: time.Now().Format(time.RFC3339),
+			RefCount:  1,
+			Variants:  []*schemas.MediaVariant{},
+		}
+	}()
+
+	return ch, nil
+}
+
+// Helper function to generate subscriber ID
+func generateSubscriberID() string {
+	return uuid.New().String()
+}
+
+// Helper function to map WebSocket status to schema status
+func mapWebSocketStatusToSchema(status string) schemas.IntentStatus {
+	switch status {
+	case "pending":
+		return schemas.IntentStatusPending
+	case "ready":
+		return schemas.IntentStatusReady
+	case "failed":
+		return schemas.IntentStatusFailed
+	case "expired":
+		return schemas.IntentStatusExpired
+	default:
+		return schemas.IntentStatusPending
+	}
+}
+
+// Helper function to create string pointer
+func strPtr(s string) *string {
+	return &s
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/getsentry/sentry-go"
 	sentryhttp "github.com/getsentry/sentry-go/http"
+	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
 // SentryMiddleware creates HTTP middleware for Sentry integration
@@ -26,7 +27,7 @@ func SentryMiddleware() func(http.Handler) http.Handler {
 
 // SentryGraphQLMiddleware creates GraphQL middleware for Sentry error tracking
 func SentryGraphQLMiddleware() graphql.ErrorPresenterFunc {
-	return func(ctx context.Context, err error) *graphql.Error {
+	return func(ctx context.Context, err error) *gqlerror.Error {
 		// Get the GraphQL error
 		gqlErr := graphql.DefaultErrorPresenter(ctx, err)
 
@@ -40,7 +41,7 @@ func SentryGraphQLMiddleware() graphql.ErrorPresenterFunc {
 			// Add GraphQL context
 			if reqCtx := graphql.GetRequestContext(ctx); reqCtx != nil {
 				scope.SetTag("graphql.operation", reqCtx.OperationName)
-				scope.SetTag("graphql.complexity", fmt.Sprintf("%d", reqCtx.ComplexityLimit))
+				// Complexity is calculated per operation, not a limit on the context
 
 				// Add operation type
 				if reqCtx.Doc != nil && len(reqCtx.Doc.Operations) > 0 {
@@ -126,10 +127,8 @@ func SentryTransactionMiddleware() graphql.ResponseMiddleware {
 		}
 
 		// Start Sentry transaction
-		span := sentry.StartSpan(ctx, "graphql.execute",
-			sentry.TransactionName(txName),
-			sentry.ContinueFromRequest(ctx.Value("request").(*http.Request)),
-		)
+		span := sentry.StartSpan(ctx, "graphql.execute")
+		span.Description = txName
 		defer span.Finish()
 
 		// Update context with span

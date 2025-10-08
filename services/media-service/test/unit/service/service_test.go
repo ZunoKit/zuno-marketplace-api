@@ -96,6 +96,19 @@ func newMockPinner(shouldFail bool) *mockPinner {
 	return &mockPinner{shouldFail: shouldFail}
 }
 
+// Mock Storage implementation
+type mockStorage struct {
+	uploadedFiles map[string][]byte
+	shouldFail    bool
+}
+
+func newMockStorage(shouldFail bool) *mockStorage {
+	return &mockStorage{
+		uploadedFiles: make(map[string][]byte),
+		shouldFail:    shouldFail,
+	}
+}
+
 func (m *mockPinner) PinFile(ctx context.Context, r io.Reader, name string) (domain.PinResult, error) {
 	if m.shouldFail {
 		return domain.PinResult{}, errors.New("pin failed")
@@ -133,11 +146,64 @@ func (m *mockPinner) GatewayURL(cid string) string {
 	return "https://gateway.pinata.cloud/ipfs/" + cid
 }
 
+// Storage interface implementation
+func (m *mockStorage) Upload(ctx context.Context, key string, r io.Reader, contentType string, metadata map[string]string) (*domain.StorageResult, error) {
+	if m.shouldFail {
+		return nil, errors.New("storage upload failed")
+	}
+
+	content, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+
+	m.uploadedFiles[key] = content
+
+	return &domain.StorageResult{
+		Key:        key,
+		SHA256:     "dummy-sha256",
+		Size:       int64(len(content)),
+		S3URL:      "https://s3.amazonaws.com/bucket/" + key,
+		CDNURL:     "https://cdn.example.com/" + key,
+		UploadedAt: time.Now(),
+	}, nil
+}
+
+func (m *mockStorage) Download(ctx context.Context, key string) (io.ReadCloser, error) {
+	if content, exists := m.uploadedFiles[key]; exists {
+		return io.NopCloser(bytes.NewReader(content)), nil
+	}
+	return nil, errors.New("file not found")
+}
+
+func (m *mockStorage) Exists(ctx context.Context, key string) (bool, error) {
+	_, exists := m.uploadedFiles[key]
+	return exists, nil
+}
+
+func (m *mockStorage) Delete(ctx context.Context, key string) error {
+	delete(m.uploadedFiles, key)
+	return nil
+}
+
+func (m *mockStorage) GetSignedURL(ctx context.Context, key string, expiry time.Duration) (string, error) {
+	return "https://s3.amazonaws.com/bucket/" + key + "?signed=true", nil
+}
+
+func (m *mockStorage) CheckSHA256(ctx context.Context, sha256Hash string) (key string, exists bool, err error) {
+	return "", false, nil
+}
+
+func (m *mockStorage) GetCDNURL(key string) string {
+	return "https://cdn.example.com/" + key
+}
+
 // Test cases
 func TestUploadAndPin_Success(t *testing.T) {
 	repo := newMockMediaRepository()
 	pinner := newMockPinner(false)
-	svc := service.NewMediaService(repo, pinner)
+	storage := newMockStorage(false)
+	svc := service.NewMediaService(repo, pinner, storage)
 
 	ctx := context.Background()
 	meta := domain.UploadMeta{
@@ -179,7 +245,8 @@ func TestUploadAndPin_Success(t *testing.T) {
 func TestUploadAndPin_Deduplication(t *testing.T) {
 	repo := newMockMediaRepository()
 	pinner := newMockPinner(false)
-	svc := service.NewMediaService(repo, pinner)
+	storage := newMockStorage(false)
+	svc := service.NewMediaService(repo, pinner, storage)
 
 	ctx := context.Background()
 	meta := domain.UploadMeta{
@@ -213,7 +280,8 @@ func TestUploadAndPin_Deduplication(t *testing.T) {
 func TestUploadAndPin_Validation(t *testing.T) {
 	repo := newMockMediaRepository()
 	pinner := newMockPinner(false)
-	svc := service.NewMediaService(repo, pinner)
+	storage := newMockStorage(false)
+	svc := service.NewMediaService(repo, pinner, storage)
 
 	ctx := context.Background()
 	meta := domain.UploadMeta{
@@ -247,7 +315,8 @@ func TestUploadAndPin_Validation(t *testing.T) {
 func TestUploadAndPin_PinFailure(t *testing.T) {
 	repo := newMockMediaRepository()
 	pinner := newMockPinner(true) // Will fail
-	svc := service.NewMediaService(repo, pinner)
+	storage := newMockStorage(false)
+	svc := service.NewMediaService(repo, pinner, storage)
 
 	ctx := context.Background()
 	meta := domain.UploadMeta{
@@ -267,7 +336,8 @@ func TestUploadAndPin_PinFailure(t *testing.T) {
 func TestGetAsset(t *testing.T) {
 	repo := newMockMediaRepository()
 	pinner := newMockPinner(false)
-	svc := service.NewMediaService(repo, pinner)
+	storage := newMockStorage(false)
+	svc := service.NewMediaService(repo, pinner, storage)
 
 	ctx := context.Background()
 
@@ -301,7 +371,8 @@ func TestGetAsset(t *testing.T) {
 func TestGetAssetByCID(t *testing.T) {
 	repo := newMockMediaRepository()
 	pinner := newMockPinner(false)
-	svc := service.NewMediaService(repo, pinner)
+	storage := newMockStorage(false)
+	svc := service.NewMediaService(repo, pinner, storage)
 
 	ctx := context.Background()
 
