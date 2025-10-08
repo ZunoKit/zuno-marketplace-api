@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/quangdang46/NFT-Marketplace/services/indexer-service/internal/domain"
 	"github.com/quangdang46/NFT-Marketplace/services/indexer-service/internal/infrastructure/blockchain"
 )
@@ -26,25 +27,57 @@ func NewMintIndexer(service *IndexerService) *MintIndexer {
 
 // ProcessMintEvents processes mint-related events for a specific chain and collection
 func (mi *MintIndexer) ProcessMintEvents(ctx context.Context, chainID string, collectionAddress string, fromBlock, toBlock *big.Int) error {
+	// Start Sentry transaction for performance monitoring
+	span := sentry.StartSpan(ctx, "indexer.process_mint_events")
+	span.SetTag("chain_id", chainID)
+	span.SetTag("collection", collectionAddress)
+	span.SetTag("from_block", fromBlock.String())
+	span.SetTag("to_block", toBlock.String())
+	defer span.Finish()
+	ctx = span.Context()
+
 	client, exists := mi.service.blockchainClients[chainID]
 	if !exists {
-		return fmt.Errorf("blockchain client not found for chain %s", chainID)
+		err := fmt.Errorf("blockchain client not found for chain %s", chainID)
+		sentry.CaptureException(err)
+		return err
 	}
 
 	// Process ERC721 Transfer events (from zero address = mint)
 	if err := mi.processERC721MintEvents(ctx, chainID, collectionAddress, fromBlock, toBlock, client); err != nil {
+		sentry.WithScope(func(scope *sentry.Scope) {
+			scope.SetTag("event_type", "ERC721_Transfer")
+			scope.SetTag("chain_id", chainID)
+			scope.SetTag("collection", collectionAddress)
+			scope.SetLevel(sentry.LevelWarning)
+			sentry.CaptureException(err)
+		})
 		fmt.Printf("Error processing ERC721 mint events: %v\n", err)
 		// Continue processing other events
 	}
 
 	// Process ERC1155 TransferSingle events (from zero address = mint)
 	if err := mi.processERC1155SingleMintEvents(ctx, chainID, collectionAddress, fromBlock, toBlock, client); err != nil {
+		sentry.WithScope(func(scope *sentry.Scope) {
+			scope.SetTag("event_type", "ERC1155_TransferSingle")
+			scope.SetTag("chain_id", chainID)
+			scope.SetTag("collection", collectionAddress)
+			scope.SetLevel(sentry.LevelWarning)
+			sentry.CaptureException(err)
+		})
 		fmt.Printf("Error processing ERC1155 single mint events: %v\n", err)
 		// Continue processing other events
 	}
 
 	// Process ERC1155 TransferBatch events (from zero address = mint)
 	if err := mi.processERC1155BatchMintEvents(ctx, chainID, collectionAddress, fromBlock, toBlock, client); err != nil {
+		sentry.WithScope(func(scope *sentry.Scope) {
+			scope.SetTag("event_type", "ERC1155_TransferBatch")
+			scope.SetTag("chain_id", chainID)
+			scope.SetTag("collection", collectionAddress)
+			scope.SetLevel(sentry.LevelWarning)
+			sentry.CaptureException(err)
+		})
 		fmt.Printf("Error processing ERC1155 batch mint events: %v\n", err)
 		// Continue processing other events
 	}

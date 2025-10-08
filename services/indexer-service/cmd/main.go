@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/quangdang46/NFT-Marketplace/services/indexer-service/internal/config"
 	"github.com/quangdang46/NFT-Marketplace/services/indexer-service/internal/infrastructure/blockchain"
 	"github.com/quangdang46/NFT-Marketplace/services/indexer-service/internal/infrastructure/events"
@@ -15,11 +16,29 @@ import (
 	"github.com/quangdang46/NFT-Marketplace/services/indexer-service/internal/service"
 	"github.com/quangdang46/NFT-Marketplace/shared/messaging"
 	"github.com/quangdang46/NFT-Marketplace/shared/mongo"
+	"github.com/quangdang46/NFT-Marketplace/shared/monitoring"
 	"github.com/quangdang46/NFT-Marketplace/shared/postgres"
 )
 
 func main() {
 	cfg := config.NewConfig()
+
+	// Initialize Sentry
+	if err := monitoring.InitSentry(&monitoring.SentryConfig{
+		DSN:              os.Getenv("SENTRY_DSN"),
+		Environment:      os.Getenv("ENVIRONMENT"),
+		Release:          os.Getenv("RELEASE_VERSION"),
+		ServiceName:      "indexer-service",
+		SampleRate:       1.0,
+		TracesSampleRate: 0.1,
+		Debug:            os.Getenv("SENTRY_DEBUG") == "true",
+	}); err != nil {
+		log.Printf("Failed to initialize Sentry: %v", err)
+	}
+	defer sentry.Flush(2 * time.Second)
+
+	// Setup panic recovery with Sentry
+	defer monitoring.RecoverWithSentry()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
