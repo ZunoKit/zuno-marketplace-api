@@ -14,6 +14,7 @@ type Config struct {
 	MongoDB      mongo.MongoConfig
 	Redis        redis.RedisConfig
 	PinataConfig PinataConfig
+	S3Config     S3Config
 }
 
 type PinataConfig struct {
@@ -22,6 +23,15 @@ type PinataConfig struct {
 	SecretKey  string
 	GatewayURL string
 	JWTKey     string
+}
+
+type S3Config struct {
+	AccessKey  string
+	SecretKey  string
+	Region     string
+	Bucket     string
+	Endpoint   string // Optional for S3-compatible services
+	CDNBaseURL string
 }
 
 // LoadConfig loads configuration from environment variables
@@ -33,6 +43,7 @@ func LoadConfig() *Config {
 		MongoDB:      loadMongoConfig(),
 		Redis:        loadRedisConfig(),
 		PinataConfig: loadPinataConfig(),
+		S3Config:     loadS3Config(),
 	}
 
 	log.Printf("Media Service config loaded - gRPC: %s",
@@ -65,6 +76,18 @@ func loadPinataConfig() PinataConfig {
 		SecretKey:  env.GetString("PINATA_SECRET_KEY", ""),
 		GatewayURL: env.GetString("PINATA_GATEWAY_URL", "https://api.pinata.cloud"),
 		JWTKey:     env.GetString("PINATA_JWT_KEY", ""),
+	}
+}
+
+// loadS3Config loads S3 configuration
+func loadS3Config() S3Config {
+	return S3Config{
+		AccessKey:  env.GetString("AWS_ACCESS_KEY_ID", ""),
+		SecretKey:  env.GetString("AWS_SECRET_ACCESS_KEY", ""),
+		Region:     env.GetString("AWS_REGION", "us-east-1"),
+		Bucket:     env.GetString("S3_BUCKET", ""),
+		Endpoint:   env.GetString("S3_ENDPOINT", ""), // Optional for MinIO/LocalStack
+		CDNBaseURL: env.GetString("CDN_BASE_URL", ""),
 	}
 }
 

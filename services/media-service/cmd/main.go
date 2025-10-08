@@ -64,9 +64,11 @@ func main() {
 	pinataClient := pinning.NewPinataClient(cfg.PinataConfig)
 
 	// Initialize service
+	// PinataClient implements both Pinner and Storage interfaces
 	mediaService := service.NewMediaService(
 		mediaRepo,
-		pinataClient,
+		pinataClient, // Pinner
+		pinataClient, // Storage
 	)
 
 	// Initialize gRPC server

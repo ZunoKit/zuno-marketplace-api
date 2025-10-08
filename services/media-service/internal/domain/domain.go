@@ -96,13 +96,49 @@ type Pinner interface {
 }
 
 //
+// =============== Storage (S3) ===============
+//
+
+type StorageResult struct {
+	Key        string
+	SHA256     string
+	Size       int64
+	S3URL      string
+	CDNURL     string
+	UploadedAt time.Time
+}
+
+type Storage interface {
+	Upload(ctx context.Context, key string, r io.Reader, contentType string, metadata map[string]string) (*StorageResult, error)
+	Download(ctx context.Context, key string) (io.ReadCloser, error)
+	Exists(ctx context.Context, key string) (bool, error)
+	Delete(ctx context.Context, key string) error
+	GetSignedURL(ctx context.Context, key string, expiry time.Duration) (string, error)
+	CheckSHA256(ctx context.Context, sha256Hash string) (key string, exists bool, err error)
+	GetCDNURL(key string) string
+}
+
+//
 // =============== Service ===============
 //
+
+// ThumbnailResult represents a generated thumbnail
+type ThumbnailResult struct {
+	Name   string
+	Width  uint32
+	Height uint32
+	Format string
+	Data   []byte
+	Size   int64
+}
 
 // MediaService covers Pinata-first (SYNC) flow and basic queries.
 type MediaService interface {
 	// Upload bytes + pin immediately; return asset with CID.
 	UploadAndPin(ctx context.Context, meta UploadMeta, r io.Reader, sizeHint int64) (asset *AssetDoc, dedup bool, err error)
+
+	// Upload to S3 and IPFS with deduplication
+	UploadMedia(ctx context.Context, files []io.Reader, metas []UploadMeta) ([]*AssetDoc, error)
 
 	// Queries
 	GetAsset(ctx context.Context, id string) (*AssetDoc, error)

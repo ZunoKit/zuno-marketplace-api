@@ -216,3 +216,97 @@ func escapeJSON(s string) string {
 	r = strings.ReplaceAll(r, "\n", "\\n")
 	return r
 }
+
+// Storage interface implementation methods
+
+// Upload uploads content to Pinata/IPFS
+func (c *PinataClient) Upload(ctx context.Context, key string, r io.Reader, contentType string, metadata map[string]string) (*domain.StorageResult, error) {
+	// Pin the file to IPFS via Pinata
+	result, err := c.PinFile(ctx, r, key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to pin file: %w", err)
+	}
+
+	// Return storage result
+	return &domain.StorageResult{
+		Key:        key,
+		SHA256:     result.CID, // IPFS CID as identifier
+		Size:       result.Size,
+		S3URL:      "", // Not applicable for IPFS
+		CDNURL:     c.GetCDNURL(result.CID),
+		UploadedAt: time.Now(),
+	}, nil
+}
+
+// Download retrieves content from Pinata/IPFS
+func (c *PinataClient) Download(ctx context.Context, key string) (io.ReadCloser, error) {
+	// Construct IPFS gateway URL
+	gatewayURL := c.GetCDNURL(key)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, gatewayURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return nil, fmt.Errorf("download failed with status: %d", resp.StatusCode)
+	}
+
+	return resp.Body, nil
+}
+
+// Exists checks if content exists on Pinata/IPFS
+func (c *PinataClient) Exists(ctx context.Context, key string) (bool, error) {
+	// Try to fetch metadata for the CID/hash
+	gatewayURL := c.GetCDNURL(key)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, gatewayURL, nil)
+	if err != nil {
+		return false, err
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return false, nil // Assume doesn't exist if we can't reach it
+	}
+	defer resp.Body.Close()
+
+	return resp.StatusCode == http.StatusOK, nil
+}
+
+// Delete unpins content from Pinata (soft delete)
+func (c *PinataClient) Delete(ctx context.Context, key string) error {
+	return c.Unpin(ctx, key)
+}
+
+// GetSignedURL returns a gateway URL for IPFS content (no expiry for public gateways)
+func (c *PinataClient) GetSignedURL(ctx context.Context, key string, expiry time.Duration) (string, error) {
+	// IPFS gateway URLs are public and don't expire
+	// Return the CDN URL
+	return c.GetCDNURL(key), nil
+}
+
+// CheckSHA256 checks if content with given SHA256 hash exists
+// Note: IPFS uses content-addressing but with different hashing
+// This is a simplified implementation
+func (c *PinataClient) CheckSHA256(ctx context.Context, sha256Hash string) (key string, exists bool, err error) {
+	// Pinata doesn't natively support SHA256 lookup
+	// This would require maintaining a separate index
+	// For now, return false (not found)
+	return "", false, nil
+}
+
+// GetCDNURL returns the CDN/gateway URL for an IPFS hash
+func (c *PinataClient) GetCDNURL(key string) string {
+	if key == "" {
+		return ""
+	}
+	// Use Pinata's dedicated gateway
+	return fmt.Sprintf("%s/ipfs/%s", c.gatewayBase, key)
+}

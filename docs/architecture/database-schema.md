@@ -1,592 +1,319 @@
 # Database Schema Documentation
 
-## Entity Relationship Diagram
+## Overview
 
-```mermaid
-erDiagram
-  %% ======================= AUTH SERVICE (Postgres) =======================
-  AUTH_NONCES {
-    string   nonce PK
-    string   account_id
-    string   domain
-    string   chain_id
-    datetime issued_at
-    datetime expires_at
-    boolean  used
-  }
+The NFT Marketplace uses a microservice architecture with PostgreSQL as the primary database and MongoDB for specific services. Each service manages its own database schema with clear boundaries.
 
-  SESSIONS {
-    uuid     session_id PK
-    uuid     user_id
-    uuid     device_id
-    string   refresh_hash
-    string   ip
-    string   ua
-    datetime created_at
-    datetime expires_at
-    datetime revoked_at
-    datetime last_used_at
-  }
+## Service Database Schemas
 
-  LOGIN_EVENTS {
-    uuid     id PK
-    uuid     user_id
-    string   account_id
-    string   ip
-    string   ua
-    string   result
-    datetime ts
-  }
+### 1. Auth Service (`auth_service`)
 
-  SESSIONS ||..|| LOGIN_EVENTS : audit
+Manages authentication, sessions, and nonces for Sign-In with Ethereum (SIWE).
 
-  %% ======================= WALLET SERVICE (Postgres) =======================
-  WALLETS {
-    uuid     id PK
-    uuid     user_id
-    string   account_id
-    string   address
-    string   chain_id
-    string   type
-    string   connector
-    boolean  is_primary
-    string   label
-    datetime verified_at
-    datetime created_at
-    datetime updated_at
-    datetime last_seen_at
-  }
+#### Tables:
 
-  APPROVALS {
-    uuid     wallet_id
-    string   chain_id
-    string   operator
-    string   standard
-    boolean  approved
-    datetime approved_at
-    datetime revoked_at
-    string   tx_hash
-    datetime updated_at
-  }
+##### `auth_nonces`
+- **Purpose**: Store one-time nonces for SIWE authentication
+- **Key Fields**:
+  - `nonce` (varchar(64), PK): Unique hex string
+  - `account_id` (varchar(42)): Ethereum address (lowercase 0x...)
+  - `domain` (varchar(255)): Domain requesting authentication
+  - `chain_id` (varchar(32)): CAIP-2 identifier (e.g., eip155:1)
+  - `expires_at` (timestamptz): TTL (max 10 minutes)
+  - `used` (boolean): Whether nonce has been consumed
+- **Constraints**: 
+  - Address must be lowercase 0x + 40 hex chars
+  - Expiry must be > issued_at and <= 10 minutes
 
-  APPROVALS_HISTORY {
-    uuid     id PK
-    uuid     wallet_id
-    string   chain_id
-    string   operator
-    string   standard
-    boolean  approved
-    string   tx_hash
-    datetime at
-  }
+##### `sessions`
+- **Purpose**: User sessions after successful SIWE verification
+- **Key Fields**:
+  - `session_id` (uuid, PK): Unique session identifier
+  - `user_id` (uuid): References user service
+  - `refresh_hash` (varchar(128)): Hash of refresh token
+  - `ip_address` (inet): Client IP
+  - `expires_at` (timestamptz): Session expiration
+  - `revoked_at` (timestamptz): When session was revoked
+  - `collection_intent_context` (jsonb): Optional collection creation context
+- **Indexes**: On user_id, expires_at, refresh_hash (unique)
 
-  WALLETS ||--o{ APPROVALS : has
-  WALLETS ||--o{ APPROVALS_HISTORY : changes
+##### `login_events`
+- **Purpose**: Audit log of all authentication attempts
+- **Key Fields**:
+  - `id` (uuid, PK): Event identifier
+  - `user_id` (uuid): User if authenticated
+  - `account_id` (varchar(42)): Wallet address used
+  - `result` (varchar(32)): success/failed/invalid_signature/etc
+  - `error_message` (text): Details if failed
+- **Valid Results**: success, failed, invalid_signature, invalid_nonce, expired_nonce, invalid_message, rate_limited
 
-  %% ======================= USER / PROFILE (Postgres) =======================
-  USERS {
-    uuid     id PK
-    string   status
-    datetime created_at
-  }
+### 2. User Service (`user_service`)
 
-  PROFILES {
-    uuid     user_id PK
-    string   username
-    string   display_name
-    string   avatar_url
-    string   banner_url
-    string   bio
-    string   locale
-    string   timezone
-    string   socials_json
-    datetime updated_at
-  }
+Manages user profiles, preferences, and relationships.
 
-  USERS ||--|| PROFILES : owns
-  USERS ||--o{ WALLETS : has
+#### Tables:
 
-  %% ======================= CHAIN REGISTRY (Postgres) =======================
-  CHAINS {
-    int      id PK
-    string   caip2
-    int      chain_numeric
-    string   name
-    string   native_symbol
-    int      decimals
-    string   explorer_url
-    boolean  enabled
-    string   features_json
-  }
+##### `users`
+- **Purpose**: Core user accounts
+- **Key Fields**:
+  - `user_id` (uuid, PK): Unique user identifier
+  - `status` (varchar(32)): active/banned/deleted/suspended
+  - `created_at`, `updated_at` (timestamptz)
+- **Triggers**: Auto-creates related records in profiles, preferences, stats
 
-  CHAIN_ENDPOINTS {
-    int      id PK
-    int      chain_id
-    string   url
-    int      priority
-    int      weight
-    string   auth_type
-    int      rate_limit
-    boolean  active
-  }
+##### `profiles`
+- **Purpose**: User profile information
+- **Key Fields**:
+  - `user_id` (uuid, PK, FK→users): One-to-one with users
+  - `username` (varchar(30), unique): Alphanumeric + underscore, 3-30 chars
+  - `display_name` (varchar(50)): Display name (max 50 chars)
+  - `bio` (text): User bio (max 500 chars)
+  - `avatar_url`, `banner_url` (text): Media URLs
+  - `socials_json` (jsonb): Social media links
 
-  CHAIN_CONTRACTS {
-    int      id PK
-    int      chain_id
-    string   name
-    string   address
-    int      start_block
-    datetime verified_at
-  }
+##### `user_preferences`
+- **Purpose**: User settings and preferences
+- **Key Fields**:
+  - `user_id` (uuid, PK, FK→users)
+  - `email_notifications`, `push_notifications`, `marketing_emails` (boolean)
+  - `theme` (varchar(20)): light/dark/auto
+  - `privacy_level` (varchar(20)): public/private/friends
+  - `currency` (varchar(10)): Default currency
 
-  CHAIN_GAS_POLICY {
-    int      chain_id PK
-    float    max_fee_gwei
-    float    priority_fee_gwei
-    float    multiplier
-    float    last_observed_base_fee_gwei
-    datetime updated_at
-  }
+##### `user_stats`
+- **Purpose**: Aggregated user statistics
+- **Key Fields**:
+  - `user_id` (uuid, PK, FK→users)
+  - `collections_count`, `items_count`, `listings_count` (integer)
+  - `sales_count`, `purchases_count` (integer)
+  - `volume_sold`, `volume_purchased` (numeric(20,8))
+  - `followers_count`, `following_count` (integer)
+- **Constraints**: All counts must be >= 0
 
-  CHAINS ||--o{ CHAIN_ENDPOINTS : has
-  CHAINS ||--o{ CHAIN_CONTRACTS : has
-  CHAINS ||--|| CHAIN_GAS_POLICY : has
+##### `user_follows`
+- **Purpose**: User follow relationships
+- **Key Fields**:
+  - `follower_id`, `following_id` (uuid, FK→users): Composite PK
+  - `created_at` (timestamptz)
+- **Constraints**: No self-follows
+- **Triggers**: Updates follower/following counts in user_stats
 
-  %% ======================= ORCHESTRATOR (Postgres) =======================
-  TX_INTENTS {
-    uuid     intent_id PK
-    string   kind
-    string   chain_id
-    string   preview_address
-    string   tx_hash
-    string   status
-    uuid     created_by
-    string   req_payload_json
-    string   error
-    datetime deadline_at
-    datetime created_at
-    datetime updated_at
-  }
+### 3. Wallet Service (`wallet_service`)
 
-  %% ======================= INDEXER (PG + Mongo) =======================
-  INDEXER_CHECKPOINTS {
-    string   chain_id PK
-    int      last_block
-    string   last_block_hash
-    datetime updated_at
-  }
+Manages wallet connections and verification.
 
-  EVENTS_RAW {
-    string   _id PK
-    string   eventId
-    string   chainId
-    int      blockNumber
-    string   blockHash
-    string   txHash
-    int      logIndex
-    string   address
-    string   topics_json
-    string   data
-    string   parsed_json
-    datetime observedAt
-    int      confirmations
-  }
+#### Tables:
 
-  %% ======================= CATALOG (Postgres) =======================
-  COLLECTIONS {
-    uuid     id PK
-    string   slug
-    string   name
-    string   description
-    string   category
-    string   image_url
-    string   banner_url
-    string   website_url
-    string   social_links_json
-    boolean  is_verified
-    boolean  is_hidden
-    string   source
-    int      total_supply
-    int      royalty_bps
-    string   royalty_receiver
-    string   metadata_standard
-    string   status
-    datetime mint_start_date
-    datetime mint_end_date
-    int      total_minted
-    int      max_supply
-    string   mint_price_text
-    int      deployed_block
-    string   index_status
-    string   tags_json
-    string   settings_json
-    datetime created_at
-    datetime updated_at
-  }
+##### `wallet_links`
+- **Purpose**: User wallet connections
+- **Key Fields**:
+  - `wallet_id` (uuid, PK): Unique wallet link
+  - `user_id` (uuid): User owning this wallet
+  - `address` (varchar(42)): Ethereum address (lowercase 0x...)
+  - `chain_id` (varchar(32)): CAIP-2 format (e.g., eip155:1)
+  - `is_primary` (boolean): Primary wallet flag
+  - `type` (varchar(20)): eoa/contract/multisig/smart_account
+  - `connector` (varchar(50)): metamask/walletconnect/etc
+- **Unique Constraints**:
+  - One address per user per chain
+  - Only one primary wallet per user
 
-  COLLECTION_ROLES {
-    string   chain_id
-    string   address
-    string   role
-    string   account
-    datetime granted_at
-  }
+##### `wallet_activity`
+- **Purpose**: Audit log of wallet actions
+- **Key Fields**:
+  - `id` (uuid, PK): Activity identifier
+  - `wallet_id` (uuid, FK→wallet_links)
+  - `action` (varchar(50)): linked/unlinked/set_primary/verified/updated
+  - `metadata` (jsonb): Additional context
+  - `ip_address` (inet), `user_agent` (text)
 
-  COLLECTION_BINDINGS {
-    uuid     id PK
-    uuid     collection_id
-    string   chain_id
-    string   family
-    string   token_standard
-    string   contract_address
-    string   mint_authority
-    string   inscription_id
-    boolean  is_primary
-  }
+##### `wallet_verifications`
+- **Purpose**: Wallet ownership verification records
+- **Key Fields**:
+  - `id` (uuid, PK): Verification identifier
+  - `wallet_id` (uuid, FK→wallet_links)
+  - `verification_type` (varchar(50)): signature/transaction/etc
+  - `status` (varchar(20)): pending/verified/failed/expired
+  - `verification_data` (jsonb): Verification details
 
-  COLLECTION_MINT_CONFIG {
-    uuid     collection_id PK
-    datetime start_date
-    datetime end_date
-    string   mint_price_text
-  }
+### 4. Catalog Service (`catalog_service`)
 
-  TOKENS {
-    uuid     id PK
-    uuid     collection_id
-    string   chain_id
-    string   family
-    string   contract_address
-    string   mint_address
-    string   inscription_id
-    string   token_number
-    string   token_standard
-    int      supply
-    boolean  burned
-    string   name
-    string   image_url
-    string   metadata_url
-    string   owner_address
-    int      minted_block
-    datetime minted_at
-    datetime last_refresh_at
-    string   metadata_doc
-  }
+Core NFT catalog with collections, tokens, and marketplace data.
 
-  TRAITS {
-    uuid     id PK
-    uuid     collection_id
-    string   name
-    string   normalized_name
-    string   value_type
-    string   display_type
-    string   unit
-    int      sort_order
-  }
+#### Tables:
 
-  TRAIT_VALUES {
-    uuid     id PK
-    uuid     trait_id
-    string   value_type
-    string   value_string
-    float    value_number
-    bigint   value_epoch_seconds
-    string   normalized_value
-    int      occurrences
-    float    frequency
-    float    rarity_score
-    float    max_value
-    string   unit
-  }
+##### `collections`
+- **Purpose**: NFT collections registry
+- **Key Fields**:
+  - `id` (uuid, PK): Collection identifier
+  - `slug` (text, unique): URL-friendly identifier
+  - `name`, `description` (text): Basic info
+  - `chain_id` (text): Blockchain identifier
+  - `contract_address` (text): Smart contract address
+  - `creator`, `owner` (text): Addresses
+  - `collection_type` (text): Type of collection
+  - `max_supply`, `total_supply` (text): Supply limits
+  - Minting config: `mint_price`, `mint_limit_per_wallet`, `mint_start_time`, etc.
+  - Social links: `discord_url`, `twitter_url`, `instagram_url`, etc.
+  - Market data: `floor_price`, `volume_traded`
+- **Unique**: (chain_id, contract_address)
 
-  TOKEN_TRAIT_LINKS {
-    uuid     token_id
-    uuid     trait_id
-    uuid     trait_value_id
-  }
+##### `tokens`
+- **Purpose**: Individual NFT tokens
+- **Key Fields**:
+  - `id` (uuid, PK): Token identifier
+  - `collection_id` (uuid, FK→collections)
+  - `chain_id`, `contract_address` (text)
+  - `token_number` (text): Token ID (string for big ints)
+  - `token_standard` (text): ERC721/ERC1155/etc
+  - `name`, `image_url`, `metadata_url` (text)
+  - `owner_address` (text): Current owner
+  - `burned` (boolean): Burn status
+- **Unique**: (collection_id, token_number)
 
-  TOKEN_BALANCES {
-    string   chain_id
-    string   contract
-    string   token_id
-    string   owner
-    numeric  quantity
-    datetime updated_at
-  }
+##### `traits` & `trait_values`
+- **Purpose**: NFT attributes and rarity
+- **traits**: Trait definitions per collection
+- **trait_values**: Possible values with occurrences and rarity scores
+- **token_trait_links**: Links tokens to their trait values
 
-  OWNERSHIP_TRANSFERS {
-    string   chain_id
-    string   contract
-    string   token_id
-    string   from_addr
-    string   to_addr
-    string   tx_hash
-    int      log_index
-    datetime at
-  }
+##### `listings`, `offers`, `sales`
+- **Purpose**: Marketplace activity
+- **Common Fields**:
+  - Price data: `price_native`, `currency_symbol`
+  - `marketplace_id` (FK→marketplaces)
+  - `tx_hash`: Transaction hash
+- **listings**: Active marketplace listings
+- **offers**: Purchase offers
+- **sales**: Completed sales history
 
-  NFT_FLAGS {
-    string   chain_id
-    string   contract
-    string   token_id
-    boolean  is_flagged
-    boolean  is_spam
-    boolean  is_frozen
-    boolean  is_nsfw
-    boolean  refreshable
-    string   reason_json
-    datetime updated_at
-  }
+##### `activities`
+- **Purpose**: Activity feed for tokens
+- **Key Fields**:
+  - `type` (text): listed/offer/sale/transfer/mint/burn
+  - `token_id` (uuid, FK→tokens)
+  - Price and transaction data
+  - `timestamp` (timestamptz): When it occurred
 
-  MARKETPLACES {
-    uuid     id PK
-    string   name
-  }
+### 5. Chain Registry Service (`chain_registry_service`)
 
-  LISTINGS {
-    uuid     id PK
-    uuid     token_id
-    uuid     marketplace_id
-    numeric  price_native
-    string   price_native_text
-    string   currency_symbol
-    boolean  is_active
-    datetime listed_at
-    datetime updated_at
-    string   seller_address
-    datetime expires_at
-    string   url
-    string   tx_hash
-  }
+Manages blockchain configurations and smart contract ABIs.
 
-  OFFERS {
-    uuid     id PK
-    uuid     token_id
-    uuid     marketplace_id
-    numeric  price_native
-    string   price_native_text
-    string   currency_symbol
-    string   from_address
-    datetime created_at
-    datetime expires_at
-    string   tx_hash
-  }
+#### Tables:
 
-  SALES {
-    uuid     id PK
-    uuid     token_id
-    uuid     marketplace_id
-    numeric  price_native
-    string   price_native_text
-    string   currency_symbol
-    string   tx_hash
-    datetime occurred_at
-  }
+##### `chains`
+- **Purpose**: Supported blockchain networks
+- **Key Fields**:
+  - `id` (serial, PK)
+  - `caip2` (caip2_chain, unique): CAIP-2 identifier (e.g., eip155:1)
+  - `chain_numeric` (integer, unique): Chain ID number
+  - `name`, `native_symbol` (text): Chain info
+  - `enabled` (boolean): Whether chain is active
 
-  ORDERS {
-    uuid     id PK
-    uuid     token_id
-    string   side
-    string   maker
-    string   taker
-    numeric  price_native
-    string   currency_symbol
-    datetime start_at
-    datetime end_at
-    string   signature
-    string   salt
-    string   source_marketplace
-    string   status
-    datetime updated_at
-  }
+##### `chain_endpoints`
+- **Purpose**: RPC endpoints per chain
+- **Key Fields**:
+  - `chain_id` (FK→chains)
+  - `url` (text): RPC endpoint
+  - `priority`, `weight` (integer): Load balancing
+  - `rate_limit` (integer): Rate limiting
 
-  ORDER_FILLS {
-    uuid     id PK
-    uuid     order_id
-    string   tx_hash
-    numeric  price_native
-    datetime filled_at
-  }
+##### `abi_blobs`
+- **Purpose**: Smart contract ABI storage
+- **Key Fields**:
+  - `sha256` (char(64), PK): Content-addressed storage
+  - `standard` (text): erc721/erc1155/custom/proxy
+  - `abi_json` (jsonb): Full ABI JSON
+  - `s3_key` (text): Storage location
 
-  COLLECTION_STATS {
-    uuid     collection_id PK
-    int      items_count
-    int      owners_count
-    numeric  floor_price_native
-    string   floor_currency_symbol
-    numeric  market_cap_est
-    datetime last_updated_at
-  }
+##### `chain_contracts`
+- **Purpose**: Contract registry per chain
+- **Key Fields**:
+  - `chain_id` (FK→chains)
+  - `address` (evm_address): Contract address
+  - `abi_sha256` (FK→abi_blobs): Link to ABI
+  - `standard` (text): Contract standard
 
-  TOKEN_RARITY {
-    uuid     token_id PK
-    float    rarity_score_product
-  }
+### 6. Orchestrator Service (`orchestrator_service`)
 
-  RARITY_SCORES {
-    uuid     token_id
-    string   method
-    string   source
-    float    score
-    int      rank
-    datetime updated_at
-  }
+Manages transaction intents and workflows.
 
-  TRAIT_VALUE_FLOOR {
-    uuid     trait_value_id PK
-    numeric  floor_price_native
-    datetime last_updated_at
-  }
+#### Tables:
 
-  ACTIVITIES {
-    uuid     id PK
-    uuid     token_id
-    string   type
-    string   from_address
-    string   to_address
-    numeric  price_native
-    string   price_native_text
-    string   currency_symbol
-    string   tx_hash
-    string   block_or_slot
-    datetime timestamp
-    string   marketplace
-  }
+##### `tx_intents`
+- **Purpose**: Transaction intent tracking
+- **Key Fields**:
+  - `intent_id` (uuid, PK): Intent identifier
+  - `kind` (text): collection/mint/etc
+  - `chain_id` (caip2_chain): Target chain
+  - `tx_hash` (evm_tx_hash): Final transaction
+  - `status` (text): pending/ready/failed/expired
+  - `auth_session_id` (varchar(255)): Session correlation
+  - `req_payload_json` (jsonb): Request data
 
-  SYNC_STATE {
-    uuid     id PK
-    uuid     collection_id
-    string   source
-    string   cursor
-    datetime last_run_at
-    string   note
-  }
+##### `session_intent_audit`
+- **Purpose**: Audit trail for session-intent correlation
+- **Key Fields**:
+  - `session_id`, `intent_id`, `user_id`: Correlation data
+  - `audit_data` (jsonb): Additional audit information
 
-  PROCESSED_EVENTS {
-    string   event_id PK
-    int      event_version
-    string   chain_id
-    string   block_hash
-    int      log_index
-    datetime processed_at
-  }
+### 7. Indexer Service (`indexer_service`)
 
-  %% ======================= MEDIA (Mongo) =======================
-  METADATA_DOCS {
-    string   _id PK
-    string   chainId
-    string   contract
-    string   tokenId
-    string   tokenURI
-    string   original_json
-    string   normalized_json
-    string   media_json
-    string   normalize_status
-    string   normalize_error
-    datetime fetchedAt
-    string   etag
-  }
+Tracks blockchain indexing progress.
 
-  MEDIA_ASSETS {
-    string   _id PK
-    string   cid
-    string   kind
-    string   source
-    string   mime
-    int      bytes
-    int      width
-    int      height
-    string   s3Key
-    string   ipfsCid
-    string   sha256
-    string   phash
-    string   moderation
-    string   exif_json
-    datetime createdAt
-  }
+#### Tables:
 
-  MEDIA_VARIANTS {
-    string   asset_id
-    string   cdnUrl
-    int      w
-    int      h
-  }
+##### `indexer_checkpoints`
+- **Purpose**: Indexer progress per chain
+- **Key Fields**:
+  - `chain_id` (text, PK): CAIP-2 Chain ID
+  - `last_block` (bigint): Last processed block height
+  - `last_block_hash` (text): Hash of last block
+  - `updated_at` (timestamptz): Last update time
 
-  %% ======================= RELATIONSHIPS =======================
-  %% Auth/User
-  USERS ||--o{ SESSIONS : sessions
+## MongoDB Collections
 
-  %% Wallet/User
-  USERS ||--o{ WALLETS : has
-  WALLETS ||--o{ APPROVALS : has
-  WALLETS ||--o{ APPROVALS_HISTORY : changes
+### Media Service
+- **media_uploads**: File upload metadata
+- **processing_jobs**: Media processing queue
 
-  %% Chain registry
-  CHAINS ||--o{ CHAIN_ENDPOINTS : has
-  CHAINS ||--o{ CHAIN_CONTRACTS : has
-  CHAINS ||--|| CHAIN_GAS_POLICY : has
+### Indexer Service  
+- **raw_events**: Raw blockchain events
+- **processing_queue**: Event processing queue
 
-  %% Catalog domain
-  COLLECTIONS ||--o{ COLLECTION_ROLES : roles
-  COLLECTIONS ||--o{ COLLECTION_BINDINGS : has
-  COLLECTIONS ||--o{ COLLECTION_MINT_CONFIG : has
-  COLLECTIONS ||--o{ TOKENS : contains
+## Database Conventions
 
-  TRAITS ||--o{ TRAIT_VALUES : has
-  TOKENS ||--o{ TOKEN_TRAIT_LINKS : has
-  TRAITS ||--o{ TOKEN_TRAIT_LINKS : link
-  TRAIT_VALUES ||--o{ TOKEN_TRAIT_LINKS : link
+### Common Patterns
+1. **UUID Primary Keys**: Most tables use UUID for distributed generation
+2. **Timestamps**: `created_at`, `updated_at` fields are standard
+3. **Soft Deletes**: Status fields instead of hard deletes
+4. **JSONB Fields**: For flexible, schema-less data
+5. **Lowercase Addresses**: All Ethereum addresses stored as lowercase
 
-  MARKETPLACES ||--o{ LISTINGS : has
-  MARKETPLACES ||--o{ OFFERS : has
-  MARKETPLACES ||--o{ SALES : has
-  TOKENS ||--o{ LISTINGS : has
-  TOKENS ||--o{ OFFERS : has
-  TOKENS ||--o{ SALES : has
-  TOKENS ||--o{ ACTIVITIES : has
+### Indexes Strategy
+1. **Primary Keys**: Automatic B-tree indexes
+2. **Foreign Keys**: Indexed for join performance
+3. **Unique Constraints**: Enforce business rules
+4. **Partial Indexes**: For filtered queries (e.g., active records only)
+5. **Covering Indexes**: Include columns to avoid table lookups
 
-  COLLECTIONS ||--|| COLLECTION_STATS : has
-  TOKENS ||--|| TOKEN_RARITY : has
-  TRAIT_VALUES ||--|| TRAIT_VALUE_FLOOR : has
+### Data Types
+- **Addresses**: `varchar(42)` for Ethereum addresses
+- **Chain IDs**: CAIP-2 format strings
+- **Amounts**: `numeric` or `text` for big numbers
+- **Timestamps**: Always `timestamptz` for timezone awareness
 
-  TOKENS ||--o{ TOKEN_BALANCES : balances
-  TOKENS ||--o{ OWNERSHIP_TRANSFERS : history
-  TOKENS ||--|| NFT_FLAGS : flags
+## Migration Strategy
 
-  TOKENS ||--o{ ORDERS : has
-  ORDERS ||--o{ ORDER_FILLS : fills
+### Principles
+1. **Forward-Only**: No down migrations (removed all down.sql files)
+2. **Idempotent**: Migrations use IF NOT EXISTS
+3. **Non-Breaking**: Add columns as nullable, migrate data, then add constraints
+4. **Atomic**: Each migration in a transaction
 
-  COLLECTIONS ||--o{ SYNC_STATE : has
-
-  MEDIA_ASSETS ||--o{ MEDIA_VARIANTS : has
-  TOKENS ||..|| METADATA_DOCS : metadata_doc
-
-  %% Indexer/Catalog idempotency
-  PROCESSED_EVENTS ||..|| LISTINGS : guard
-  PROCESSED_EVENTS ||..|| OFFERS   : guard
-  PROCESSED_EVENTS ||..|| SALES    : guard
-  PROCESSED_EVENTS ||..|| TOKENS   : guard
-  INDEXER_CHECKPOINTS ||..|| EVENTS_RAW : drive
-```
-
-## Database Distribution
-
-### PostgreSQL Databases
-- **auth_db**: Authentication, sessions, nonces
-- **user_db**: User profiles and account information
-- **wallets_db**: Wallet connections and approvals
-- **chain_registry_db**: Chain configurations and contracts
-- **orchestrator_db**: Transaction intents and orchestration
-- **indexer_db**: Blockchain indexing checkpoints
-- **catalog_db**: Collections, NFTs, marketplace data
-
-### MongoDB Collections
-- **events.raw**: Raw blockchain event logs
-- **metadata.docs**: NFT metadata normalization
-- **media.assets**: Media files and variants
-
-### Redis Stores
-- **Authentication**: Session management, nonce validation
-- **Chain Registry**: Contract and policy caching
-- **Intent Status**: Real-time transaction tracking
-- **Read Cache**: Query result caching
+### Best Practices
+1. Always backup before migrations
+2. Test migrations in staging first
+3. Monitor migration performance
+4. Keep migrations small and focused
+5. Document breaking changes

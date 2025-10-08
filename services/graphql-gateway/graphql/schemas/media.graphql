@@ -74,4 +74,9 @@ extend type Query {
 
 extend type Mutation {
   uploadSingleFile(input: UploadSingleFileInput!): UploadSingleFilePayload!
+  uploadMedia(files: [Upload!]!): [MediaAsset!]!
+}
+
+extend type Subscription {
+  onMediaPinned(assetId: String!): MediaAsset!
 }

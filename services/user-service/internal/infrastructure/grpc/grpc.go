@@ -4,46 +4,44 @@ import (
 	"context"
 
 	"github.com/quangdang46/NFT-Marketplace/services/user-service/internal/domain"
-	userProto "github.com/quangdang46/NFT-Marketplace/shared/proto/user"
+	protoUser "github.com/quangdang46/NFT-Marketplace/shared/proto/user"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 type gRPCHandler struct {
-	userProto.UnimplementedUserServiceServer
+	protoUser.UnimplementedUserServiceServer
 	userService domain.UserService
 }
 
-func NewgRPCHandler(userService domain.UserService) *gRPCHandler {
+func NewgRPCHandler(server *grpc.Server, userService domain.UserService) *gRPCHandler {
 	handler := &gRPCHandler{
 		userService: userService,
 	}
 	return handler
 }
 
-func (s *gRPCHandler) EnsureUser(ctx context.Context, req *userProto.EnsureUserRequest) (*userProto.EnsureUserResponse, error) {
-	// Validate request
-	if req == nil {
-		return nil, status.Error(codes.InvalidArgument, "request cannot be nil")
+func (g *gRPCHandler) EnsureUser(ctx context.Context, req *protoUser.EnsureUserRequest) (*protoUser.EnsureUserResponse, error) {
+	accountID := req.GetAccountId()
+	address := req.GetAddress()
+	chainID := req.GetChainId()
+
+	if accountID == "" || address == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "account_id and address are required")
 	}
 
-	if req.AccountId == "" {
-		return nil, status.Error(codes.InvalidArgument, "account_id is required")
-	}
-
-	if req.Address == "" {
-		return nil, status.Error(codes.InvalidArgument, "address is required")
-	}
-
-	// Call service layer
-	result, err := s.userService.EnsureUser(ctx, req.AccountId, req.Address, req.ChainId)
+	userID, created, err := g.userService.EnsureUser(ctx, accountID, address, chainID)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		// Map domain errors to gRPC status codes
+		if err == domain.ErrInvalidAddress {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
+		}
+		return nil, status.Errorf(codes.Internal, "failed to ensure user: %v", err)
 	}
 
-	// Return response
-	return &userProto.EnsureUserResponse{
-		UserId:  result.UserID,
-		Created: result.Created,
+	return &protoUser.EnsureUserResponse{
+		UserId:  string(userID),
+		Created: created,
 	}, nil
 }

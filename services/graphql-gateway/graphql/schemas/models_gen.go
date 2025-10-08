@@ -55,6 +55,15 @@ type ChainRPCEndpoints struct {
 	RegistryVersion string         `json:"registryVersion"`
 }
 
+type CollectionStatus struct {
+	IntentID        string  `json:"intentId"`
+	Status          string  `json:"status"`
+	ContractAddress *string `json:"contractAddress,omitempty"`
+	TxHash          *string `json:"txHash,omitempty"`
+	ChainID         *string `json:"chainId,omitempty"`
+	Error           *string `json:"error,omitempty"`
+}
+
 type Contract struct {
 	Name        string            `json:"name"`
 	Address     string            `json:"address"`
@@ -126,6 +135,17 @@ type MediaVariant struct {
 	Format VariantFormat `json:"format"`
 }
 
+type MintStatus struct {
+	IntentID string       `json:"intentId"`
+	Status   IntentStatus `json:"status"`
+	Contract *string      `json:"contract,omitempty"`
+	TokenIds []string     `json:"tokenIds,omitempty"`
+	TxHash   *string      `json:"txHash,omitempty"`
+	ChainID  *string      `json:"chainId,omitempty"`
+	Error    *string      `json:"error,omitempty"`
+	Metadata *string      `json:"metadata,omitempty"`
+}
+
 type Mutation struct {
 }
 
@@ -137,6 +157,7 @@ type PrepareCreateCollectionInput struct {
 	ChainID                string  `json:"chainId"`
 	Name                   string  `json:"name"`
 	Symbol                 string  `json:"symbol"`
+	Creator                string  `json:"creator"`
 	TokenURI               *string `json:"tokenURI,omitempty"`
 	Type                   string  `json:"type"`
 	Description            *string `json:"description,omitempty"`
@@ -145,6 +166,7 @@ type PrepareCreateCollectionInput struct {
 	MaxSupply              *string `json:"maxSupply,omitempty"`
 	MintLimitPerWallet     *string `json:"mintLimitPerWallet,omitempty"`
 	MintStartTime          *string `json:"mintStartTime,omitempty"`
+	MintEndTime            *string `json:"mintEndTime,omitempty"`
 	AllowlistMintPrice     *string `json:"allowlistMintPrice,omitempty"`
 	PublicMintPrice        *string `json:"publicMintPrice,omitempty"`
 	AllowlistStageDuration *string `json:"allowlistStageDuration,omitempty"`

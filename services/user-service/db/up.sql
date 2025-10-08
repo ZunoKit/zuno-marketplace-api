@@ -1,77 +1,198 @@
+BEGIN;
 
-
--- Extensions (for gen_random_uuid)
+-- Extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- ---------- USERS ----------
+-- ======================= USERS =======================
 CREATE TABLE IF NOT EXISTS users (
-    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    status     VARCHAR(50) NOT NULL DEFAULT 'active',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT users_status_check CHECK (status IN ('active', 'suspended', 'deleted'))
+    user_id     uuid         PRIMARY KEY DEFAULT gen_random_uuid(),
+    status      varchar(32)  NOT NULL DEFAULT 'active',
+    created_at  timestamptz  NOT NULL DEFAULT now(),
+    updated_at  timestamptz  NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_users_status     ON users(status);
+-- Status validation
+ALTER TABLE users
+  DROP CONSTRAINT IF EXISTS chk_user_status,
+  ADD  CONSTRAINT chk_user_status
+  CHECK (status IN ('active', 'banned', 'deleted', 'suspended'));
+
+-- Index for status queries
+CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
 CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at);
 
--- ---------- PROFILES ----------
+-- ======================= PROFILES =======================
 CREATE TABLE IF NOT EXISTS profiles (
-    user_id      UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    username     VARCHAR(50),
-    display_name VARCHAR(100),
-    avatar_url   TEXT,
-    banner_url   TEXT,
-    bio          TEXT CHECK (length(bio) <= 500),
-    locale       VARCHAR(10)  NOT NULL DEFAULT 'en',
-    timezone     VARCHAR(50)  NOT NULL DEFAULT 'UTC',
-    socials_json JSONB        NOT NULL DEFAULT '{}',
-    updated_at   TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT profiles_username_length  CHECK (username IS NULL OR (length(username) BETWEEN 3 AND 50)),
-    CONSTRAINT profiles_username_format  CHECK (username IS NULL OR username ~ '^[a-zA-Z0-9_-]+$'),
-    CONSTRAINT profiles_display_name_len CHECK (display_name IS NULL OR length(display_name) <= 100),
-    CONSTRAINT profiles_avatar_url_fmt   CHECK (avatar_url IS NULL OR avatar_url ~ '^https?://'),
-    CONSTRAINT profiles_banner_url_fmt   CHECK (banner_url IS NULL OR banner_url ~ '^https?://')
+    user_id      uuid         PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
+    username     varchar(30)  UNIQUE,
+    display_name varchar(50),
+    avatar_url   text,
+    banner_url   text,
+    bio          text,
+    locale       varchar(10)  DEFAULT 'en',
+    timezone     varchar(50)  DEFAULT 'UTC',
+    socials_json jsonb,
+    updated_at   timestamptz  NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_profiles_username    ON profiles(username) WHERE username IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_profiles_updated_at  ON profiles(updated_at);
+-- Username validation (alphanumeric and underscore only)
+ALTER TABLE profiles
+  DROP CONSTRAINT IF EXISTS chk_username_format,
+  ADD  CONSTRAINT chk_username_format
+  CHECK (username ~ '^[a-zA-Z0-9_]{3,30}$');
 
--- Unique (case-insensitive) on username
-CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_username_unique
-    ON profiles (LOWER(username))
-    WHERE username IS NOT NULL;
+-- Bio length limit
+ALTER TABLE profiles
+  DROP CONSTRAINT IF EXISTS chk_bio_length,
+  ADD  CONSTRAINT chk_bio_length
+  CHECK (char_length(bio) <= 500);
 
--- Auto-update updated_at on profiles
-CREATE OR REPLACE FUNCTION update_updated_at_column()
+-- Display name length limit
+ALTER TABLE profiles
+  DROP CONSTRAINT IF EXISTS chk_display_name_length,
+  ADD  CONSTRAINT chk_display_name_length
+  CHECK (char_length(display_name) <= 50);
+
+-- Indexes for profile queries
+CREATE INDEX IF NOT EXISTS idx_profiles_username ON profiles(username);
+CREATE INDEX IF NOT EXISTS idx_profiles_updated_at ON profiles(updated_at);
+
+-- ======================= USER PREFERENCES =======================
+CREATE TABLE IF NOT EXISTS user_preferences (
+    user_id               uuid         PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
+    email_notifications   boolean      DEFAULT true,
+    push_notifications    boolean      DEFAULT true,
+    marketing_emails      boolean      DEFAULT false,
+    language              varchar(10)  DEFAULT 'en',
+    currency              varchar(10)  DEFAULT 'USD',
+    theme                 varchar(20)  DEFAULT 'light',
+    privacy_level         varchar(20)  DEFAULT 'public',
+    show_activity         boolean      DEFAULT true,
+    updated_at            timestamptz  NOT NULL DEFAULT now()
+);
+
+-- Theme validation
+ALTER TABLE user_preferences
+  DROP CONSTRAINT IF EXISTS chk_theme,
+  ADD  CONSTRAINT chk_theme
+  CHECK (theme IN ('light', 'dark', 'auto'));
+
+-- Privacy level validation
+ALTER TABLE user_preferences
+  DROP CONSTRAINT IF EXISTS chk_privacy_level,
+  ADD  CONSTRAINT chk_privacy_level
+  CHECK (privacy_level IN ('public', 'private', 'friends'));
+
+-- ======================= USER STATS =======================
+CREATE TABLE IF NOT EXISTS user_stats (
+    user_id           uuid         PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
+    collections_count integer      DEFAULT 0,
+    items_count       integer      DEFAULT 0,
+    listings_count    integer      DEFAULT 0,
+    sales_count       integer      DEFAULT 0,
+    purchases_count   integer      DEFAULT 0,
+    volume_sold       numeric(20,8) DEFAULT 0,
+    volume_purchased  numeric(20,8) DEFAULT 0,
+    followers_count   integer      DEFAULT 0,
+    following_count   integer      DEFAULT 0,
+    updated_at        timestamptz  NOT NULL DEFAULT now()
+);
+
+-- Non-negative constraints
+ALTER TABLE user_stats
+  ADD CONSTRAINT chk_stats_non_negative CHECK (
+    collections_count >= 0 AND
+    items_count >= 0 AND
+    listings_count >= 0 AND
+    sales_count >= 0 AND
+    purchases_count >= 0 AND
+    volume_sold >= 0 AND
+    volume_purchased >= 0 AND
+    followers_count >= 0 AND
+    following_count >= 0
+  );
+
+-- ======================= USER FOLLOWS =======================
+CREATE TABLE IF NOT EXISTS user_follows (
+    follower_id  uuid         NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    following_id uuid         NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    created_at   timestamptz  NOT NULL DEFAULT now(),
+    PRIMARY KEY (follower_id, following_id)
+);
+
+-- Prevent self-follow
+ALTER TABLE user_follows
+  ADD CONSTRAINT chk_no_self_follow CHECK (follower_id != following_id);
+
+-- Indexes for follow queries
+CREATE INDEX IF NOT EXISTS idx_user_follows_follower ON user_follows(follower_id);
+CREATE INDEX IF NOT EXISTS idx_user_follows_following ON user_follows(following_id);
+
+-- ======================= FUNCTIONS =======================
+
+-- Update user stats function
+CREATE OR REPLACE FUNCTION update_user_stats()
 RETURNS TRIGGER AS $$
 BEGIN
-  NEW.updated_at = CURRENT_TIMESTAMP;
-  RETURN NEW;
+    -- Update follower/following counts when follows change
+    IF TG_TABLE_NAME = 'user_follows' THEN
+        IF TG_OP = 'INSERT' THEN
+            UPDATE user_stats SET followers_count = followers_count + 1, updated_at = now() 
+            WHERE user_id = NEW.following_id;
+            UPDATE user_stats SET following_count = following_count + 1, updated_at = now() 
+            WHERE user_id = NEW.follower_id;
+        ELSIF TG_OP = 'DELETE' THEN
+            UPDATE user_stats SET followers_count = GREATEST(0, followers_count - 1), updated_at = now() 
+            WHERE user_id = OLD.following_id;
+            UPDATE user_stats SET following_count = GREATEST(0, following_count - 1), updated_at = now() 
+            WHERE user_id = OLD.follower_id;
+        END IF;
+    END IF;
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS update_profiles_updated_at ON profiles;
-CREATE TRIGGER update_profiles_updated_at
-BEFORE UPDATE ON profiles
-FOR EACH ROW
-EXECUTE FUNCTION update_updated_at_column();
+-- Trigger for follow stats
+CREATE TRIGGER update_follow_stats
+    AFTER INSERT OR DELETE ON user_follows
+    FOR EACH ROW
+    EXECUTE FUNCTION update_user_stats();
 
--- ---------- USER_ACCOUNTS ----------
--- Mapping: 1 account_id -> 1 user_id (PK = account_id)
-CREATE TABLE IF NOT EXISTS user_accounts (
-    account_id   VARCHAR(255) PRIMARY KEY,                -- external account identifier
-    user_id      UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    address      VARCHAR(42) NOT NULL,                    -- lowercase EVM address
-    chain_id     TEXT,                                    -- CAIP-2 (optional)
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+-- Auto-create related records when user is created
+CREATE OR REPLACE FUNCTION create_user_related_records()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Create default profile
+    INSERT INTO profiles (user_id, username, display_name)
+    VALUES (NEW.user_id, NULL, NULL)
+    ON CONFLICT (user_id) DO NOTHING;
+    
+    -- Create default preferences
+    INSERT INTO user_preferences (user_id)
+    VALUES (NEW.user_id)
+    ON CONFLICT (user_id) DO NOTHING;
+    
+    -- Create default stats
+    INSERT INTO user_stats (user_id)
+    VALUES (NEW.user_id)
+    ON CONFLICT (user_id) DO NOTHING;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
-    CONSTRAINT user_accounts_address_format CHECK (address ~ '^0x[a-f0-9]{40}$')
-);
+-- Trigger for creating related records
+CREATE TRIGGER create_user_defaults
+    AFTER INSERT ON users
+    FOR EACH ROW
+    EXECUTE FUNCTION create_user_related_records();
 
--- Helpful indexes
-CREATE INDEX IF NOT EXISTS idx_user_accounts_user_id       ON user_accounts(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_accounts_address       ON user_accounts(address);
-CREATE INDEX IF NOT EXISTS idx_user_accounts_created_at    ON user_accounts(created_at);
-CREATE INDEX IF NOT EXISTS idx_user_accounts_last_seen_at  ON user_accounts(last_seen_at);
+-- ======================= COMMENTS =======================
+COMMENT ON TABLE users IS 'Core user accounts';
+COMMENT ON TABLE profiles IS 'User profile information';
+COMMENT ON TABLE user_preferences IS 'User preferences and settings';
+COMMENT ON TABLE user_stats IS 'Aggregated user statistics';
+COMMENT ON TABLE user_follows IS 'User follow relationships';
+
+COMMIT;

@@ -25,15 +25,14 @@ k8s_yaml('./infra/development/k8s/wallet-service-deployment.yaml')
 k8s_yaml('./infra/development/k8s/graphql-gateway-deployment.yaml')
 k8s_yaml('./infra/development/k8s/media-service-deployment.yaml')
 k8s_yaml('./infra/development/k8s/chain-registry-service-deployment.yaml')
-## Orchestrator Service (new)
-# k8s_yaml for orchestrator is added below after build section
+# Orchestrator, Catalog and Indexer are added below after build sections
 
 ### End of K8s Config ###
 
 ### PostgreSQL Database ###
 local_resource(
   'postgres-build',
-  cmd='infra\\development\\docker\\postgres-build.bat',
+  cmd='infra\\development\\build\\postgres-build.bat',
   deps=['services/auth-service/db/up.sql', 'services/user-service/db/up.sql', 'services/wallet-service/db/up.sql', 'services/chain-registry-service/db/up.sql', 'infra/development/docker/postgres.dockerfile']
 )
 
@@ -47,7 +46,7 @@ docker_build(
 
 gateway_compile_cmd = 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/graphql-gateway ./services/graphql-gateway'
 if os.name == 'nt':
-  gateway_compile_cmd = 'infra\\development\\docker\\graphql-gateway-build.bat'
+  gateway_compile_cmd = 'infra\\development\\build\\graphql-gateway-build.bat'
 
 local_resource(
   'graphql-gateway-compile',
@@ -79,7 +78,7 @@ k8s_resource('graphql-gateway', port_forwards=8081,
 
 auth_compile_cmd = 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/auth-service ./services/auth-service/cmd'
 if os.name == 'nt':
-  auth_compile_cmd = 'infra\\development\\docker\\auth-build.bat'
+  auth_compile_cmd = 'infra\\development\\build\\auth-build.bat'
 
 local_resource(
   'auth-service-compile',
@@ -111,7 +110,7 @@ k8s_resource('auth-service', port_forwards="50051:50051",
 
 user_compile_cmd = 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/user-service ./services/user-service/cmd'
 if os.name == 'nt':
-  user_compile_cmd = 'infra\\development\\docker\\user-build.bat'
+  user_compile_cmd = 'infra\\development\\build\\user-build.bat'
 
 local_resource(
   'user-service-compile',
@@ -143,7 +142,7 @@ k8s_resource('user-service', port_forwards="50052:50052",
 
 wallet_compile_cmd = 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/wallet-service ./services/wallet-service/cmd'
 if os.name == 'nt':
-  wallet_compile_cmd = 'infra\\development\\docker\\wallet-build.bat'
+  wallet_compile_cmd = 'infra\\development\\build\\wallet-build.bat'
 
 local_resource(
   'wallet-service-compile',
@@ -175,7 +174,7 @@ k8s_resource('wallet-service', port_forwards="50053:50053",
 
 media_compile_cmd = 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/media-service ./services/media-service/cmd'
 if os.name == 'nt':
-  media_compile_cmd = 'infra\\development\\docker\\media-build.bat'
+  media_compile_cmd = 'infra\\development\\build\\media-build.bat'
 
 local_resource(
   'media-service-compile',
@@ -207,7 +206,7 @@ k8s_resource('media-service', port_forwards="50055:50055",
 
 orchestrator_compile_cmd = 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/orchestrator-service ./services/orchestrator-service/cmd'
 if os.name == 'nt':
-  orchestrator_compile_cmd = 'infra\\development\\docker\\orchestrator-build.bat'
+  orchestrator_compile_cmd = 'infra\\development\\build\\orchestrator-build.bat'
 
 local_resource(
   'orchestrator-service-compile',
@@ -241,7 +240,7 @@ k8s_resource('orchestrator-service', port_forwards="50054:50054",
 
 chain_registry_compile_cmd = 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/chain-registry-service ./services/chain-registry-service/cmd'
 if os.name == 'nt':
-  chain_registry_compile_cmd = 'infra\\development\\docker\\chain-registry-build.bat'
+  chain_registry_compile_cmd = 'infra\\development\\build\\chain-registry-build.bat'
 
 local_resource(
   'chain-registry-service-compile',
@@ -268,6 +267,106 @@ k8s_resource('chain-registry-service', port_forwards="50056:50056",
              resource_deps=['chain-registry-service-compile', 'postgres', 'redis'], labels="services")
 
 ### End of Chain Registry Service ###
+
+### Catalog Service ###
+
+catalog_compile_cmd = 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/catalog-service ./services/catalog-service/cmd'
+if os.name == 'nt':
+  catalog_compile_cmd = 'infra\\development\\build\\catalog-build.bat'
+
+local_resource(
+  'catalog-service-compile',
+  catalog_compile_cmd,
+  deps=['./services/catalog-service', './shared'], 
+  labels="compiles")
+
+docker_build_with_restart(
+  'nft-marketplace/catalog-service',
+  '.',
+  entrypoint=['/app/build/catalog-service'],
+  dockerfile='./infra/development/docker/catalog-service.Dockerfile',
+  only=[
+    './build/catalog-service',
+    './shared',
+  ],
+  live_update=[
+    sync('./build', '/app/build'),
+    sync('./shared', '/app/shared'),
+  ],
+)
+
+k8s_yaml('./infra/development/k8s/catalog-service-deployment.yaml')
+
+k8s_resource('catalog-service', port_forwards="50057:50057",
+             resource_deps=['catalog-service-compile', 'postgres', 'redis'], labels="services")
+
+### End of Catalog Service ###
+
+### Indexer Service ###
+
+indexer_compile_cmd = 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/indexer-service ./services/indexer-service/cmd'
+if os.name == 'nt':
+  indexer_compile_cmd = 'infra\\development\\build\\indexer-build.bat'
+
+local_resource(
+  'indexer-service-compile',
+  indexer_compile_cmd,
+  deps=['./services/indexer-service', './shared'], 
+  labels="compiles")
+
+docker_build_with_restart(
+  'nft-marketplace/indexer-service',
+  '.',
+  entrypoint=['/app/build/indexer-service'],
+  dockerfile='./infra/development/docker/indexer-service.Dockerfile',
+  only=[
+    './build/indexer-service',
+    './shared',
+  ],
+  live_update=[
+    sync('./build', '/app/build'),
+    sync('./shared', '/app/shared'),
+  ],
+)
+
+k8s_yaml('./infra/development/k8s/indexer-service-deployment.yaml')
+
+k8s_resource('indexer-service', port_forwards="50058:50058",
+             resource_deps=['indexer-service-compile', 'postgres', 'mongo', 'redis'], labels="services")
+
+### End of Indexer Service ###
+
+### Subscription Worker ###
+
+subscription_compile_cmd = 'CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/subscription-worker ./services/subscription-worker/cmd'
+if os.name == 'nt':
+  subscription_compile_cmd = 'infra\\development\\build\\subscription-build.bat'
+
+local_resource(
+  'subscription-worker-compile',
+  subscription_compile_cmd,
+  deps=['./services/subscription-worker', './shared'], 
+  labels="compiles")
+
+docker_build_with_restart(
+  'nft-marketplace/subscription-worker',
+  '.',
+  entrypoint=['/app/build/subscription-worker'],
+  dockerfile='./infra/development/docker/subscription-worker.Dockerfile',
+  only=[
+    './build/subscription-worker',
+    './shared',
+  ],
+  live_update=[
+    sync('./build', '/app/build'),
+    sync('./shared', '/app/shared'),
+  ],
+)
+
+k8s_yaml('./infra/development/k8s/subscription-worker-deployment.yaml')
+k8s_resource('subscription-worker', resource_deps=['subscription-worker-compile', 'postgres', 'redis', 'rabbitmq'], labels="workers")
+
+### End of Subscription Worker ###
 
 ### Infrastructure Services ###
 

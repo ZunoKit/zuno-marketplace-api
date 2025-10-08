@@ -8,6 +8,7 @@ scalar Upload
 scalar CID
 scalar URL
 scalar BigInt
+scalar JSON
 type User {
   id: ID!
   # Add other user fields as needed

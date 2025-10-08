@@ -436,6 +436,12 @@ func (s *Service) hashRefreshToken(token string) string {
 	return hex.EncodeToString(hash[:])
 }
 
+// HashRefreshToken is a public helper for testing
+func HashRefreshToken(token string) string {
+	hash := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(hash[:])
+}
+
 // generateAccessToken creates a JWT access token
 func (s *Service) generateAccessToken(userID, sessionID string) (string, time.Time, error) {
 	now := time.Now()

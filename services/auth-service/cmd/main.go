@@ -12,6 +12,7 @@ import (
 	"github.com/quangdang46/NFT-Marketplace/services/auth-service/internal/infrastructure/events"
 	grpc_handler "github.com/quangdang46/NFT-Marketplace/services/auth-service/internal/infrastructure/grpc"
 	"github.com/quangdang46/NFT-Marketplace/services/auth-service/internal/infrastructure/repository"
+	"github.com/quangdang46/NFT-Marketplace/services/auth-service/internal/middleware"
 	"github.com/quangdang46/NFT-Marketplace/services/auth-service/internal/service"
 	"github.com/quangdang46/NFT-Marketplace/shared/messaging"
 	"github.com/quangdang46/NFT-Marketplace/shared/postgres"
@@ -86,7 +87,13 @@ func main() {
 		cfg.Features.EnableCollectionContext,
 	)
 
-	server := grpc.NewServer()
+	// Create rate limiter
+	methodRateLimiter := middleware.NewMethodRateLimiter(middleware.AuthServiceRateLimitConfig())
+
+	// Create gRPC server with interceptors
+	server := grpc.NewServer(
+		grpc.UnaryInterceptor(methodRateLimiter.UnaryInterceptor()),
+	)
 
 	handler := grpc_handler.NewgRPCHandler(server, authService)
 	authProto.RegisterAuthServiceServer(server, handler)

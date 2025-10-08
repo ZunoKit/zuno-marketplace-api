@@ -1,137 +1,215 @@
--- Create wallets table
-CREATE TABLE IF NOT EXISTS wallets (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL,
-    account_id VARCHAR(255) NOT NULL,
-    address VARCHAR(42) NOT NULL, -- Ethereum addresses are 42 chars (0x + 40 hex chars)
-    chain_id VARCHAR(255) NOT NULL, -- CAIP-2 format like "eip155:1"
-    type VARCHAR(50) NOT NULL DEFAULT 'eoa', -- "eoa", "contract"
-    connector VARCHAR(100) NOT NULL DEFAULT 'unknown', -- "metamask", "walletconnect", etc.
-    is_primary BOOLEAN NOT NULL DEFAULT FALSE,
-    label VARCHAR(255),
-    verified_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    last_seen_at TIMESTAMP WITH TIME ZONE,
-    
-    -- Constraints
-    CONSTRAINT wallets_address_check CHECK (address ~ '^0x[a-fA-F0-9]{40}$'),
-    CONSTRAINT wallets_chain_id_check CHECK (chain_id ~ '^[a-zA-Z0-9]+:[0-9]+$')
+BEGIN;
+
+-- Extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- ======================= WALLET LINKS =======================
+CREATE TABLE IF NOT EXISTS wallet_links (
+    wallet_id    uuid         PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id      uuid         NOT NULL,  -- References users table from user service
+    account_id   varchar(255) NOT NULL,  -- Account identifier (e.g., EOA address)
+    address      varchar(42)  NOT NULL,  -- Ethereum address (lowercase 0x...)
+    chain_id     varchar(32)  NOT NULL,  -- CAIP-2 format (e.g., "eip155:1")
+    is_primary   boolean      NOT NULL DEFAULT false,
+    type         varchar(20)  DEFAULT 'eoa',  -- eoa, contract, etc.
+    connector    varchar(50),              -- metamask, walletconnect, etc.
+    label        varchar(100),             -- User-defined label
+    verified_at  timestamptz  NOT NULL DEFAULT now(),
+    created_at   timestamptz  NOT NULL DEFAULT now(),
+    updated_at   timestamptz  NOT NULL DEFAULT now()
 );
 
--- Create unique constraint to prevent duplicate wallet links
-CREATE UNIQUE INDEX IF NOT EXISTS idx_wallets_user_address_chain 
-ON wallets (user_id, address, chain_id);
-
--- Create index for faster lookups
-CREATE INDEX IF NOT EXISTS idx_wallets_user_id ON wallets (user_id);
-CREATE INDEX IF NOT EXISTS idx_wallets_address ON wallets (address);
-CREATE INDEX IF NOT EXISTS idx_wallets_chain_id ON wallets (chain_id);
-CREATE INDEX IF NOT EXISTS idx_wallets_is_primary ON wallets (user_id, is_primary) WHERE is_primary = TRUE;
-
--- Create approvals table
-CREATE TABLE IF NOT EXISTS approvals (
-    wallet_id UUID NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
-    chain_id VARCHAR(255) NOT NULL,
-    operator VARCHAR(42) NOT NULL, -- Contract address
-    standard VARCHAR(20) NOT NULL, -- "erc20", "erc721", "erc1155"
-    approved BOOLEAN NOT NULL,
-    approved_at TIMESTAMP WITH TIME ZONE,
-    revoked_at TIMESTAMP WITH TIME ZONE,
-    tx_hash VARCHAR(66) NOT NULL, -- Transaction hash (0x + 64 hex chars)
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    
-    -- Constraints
-    PRIMARY KEY (wallet_id, chain_id, operator, standard),
-    CONSTRAINT approvals_operator_check CHECK (operator ~ '^0x[a-fA-F0-9]{40}$'),
-    CONSTRAINT approvals_tx_hash_check CHECK (tx_hash ~ '^0x[a-fA-F0-9]{64}$'),
-    CONSTRAINT approvals_standard_check CHECK (standard IN ('erc20', 'erc721', 'erc1155')),
-    CONSTRAINT approvals_chain_id_check CHECK (chain_id ~ '^[a-zA-Z0-9]+:[0-9]+$')
-);
-
--- Create indexes for approvals
-CREATE INDEX IF NOT EXISTS idx_approvals_wallet_id ON approvals (wallet_id);
-CREATE INDEX IF NOT EXISTS idx_approvals_chain_id ON approvals (chain_id);
-CREATE INDEX IF NOT EXISTS idx_approvals_operator ON approvals (operator);
-CREATE INDEX IF NOT EXISTS idx_approvals_standard ON approvals (standard);
-
--- Create approvals_history table for audit trail
-CREATE TABLE IF NOT EXISTS approvals_history (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    wallet_id UUID NOT NULL,
-    chain_id VARCHAR(255) NOT NULL,
-    operator VARCHAR(42) NOT NULL,
-    standard VARCHAR(20) NOT NULL,
-    approved BOOLEAN NOT NULL,
-    tx_hash VARCHAR(66) NOT NULL,
-    at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    
-    -- Constraints
-    CONSTRAINT approvals_history_operator_check CHECK (operator ~ '^0x[a-fA-F0-9]{40}$'),
-    CONSTRAINT approvals_history_tx_hash_check CHECK (tx_hash ~ '^0x[a-fA-F0-9]{64}$'),
-    CONSTRAINT approvals_history_standard_check CHECK (standard IN ('erc20', 'erc721', 'erc1155')),
-    CONSTRAINT approvals_history_chain_id_check CHECK (chain_id ~ '^[a-zA-Z0-9]+:[0-9]+$')
-);
-
--- Create indexes for approvals_history
-CREATE INDEX IF NOT EXISTS idx_approvals_history_wallet_id ON approvals_history (wallet_id);
-CREATE INDEX IF NOT EXISTS idx_approvals_history_at ON approvals_history (at DESC);
-
--- Create function to update updated_at timestamp
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
+-- Fallback for UUID generation if pgcrypto is not available
+DO $$
 BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
+  PERFORM gen_random_uuid();
+EXCEPTION WHEN undefined_function THEN
+  EXECUTE 'ALTER TABLE wallet_links ALTER COLUMN wallet_id SET DEFAULT uuid_generate_v4()';
 END;
-$$ language 'plpgsql';
+$$;
 
--- Create triggers to automatically update updated_at
-CREATE TRIGGER update_wallets_updated_at 
-    BEFORE UPDATE ON wallets 
-    FOR EACH ROW 
-    EXECUTE FUNCTION update_updated_at_column();
+-- Address validation (lowercase 0x + 40 hex characters)
+ALTER TABLE wallet_links
+  DROP CONSTRAINT IF EXISTS chk_address_format,
+  ADD  CONSTRAINT chk_address_format
+  CHECK (address = lower(address) AND address ~ '^0x[0-9a-f]{40}$');
 
-CREATE TRIGGER update_approvals_updated_at 
-    BEFORE UPDATE ON approvals 
-    FOR EACH ROW 
-    EXECUTE FUNCTION update_updated_at_column();
+-- Chain ID validation (CAIP-2 format)
+ALTER TABLE wallet_links
+  DROP CONSTRAINT IF EXISTS chk_chain_id_format,
+  ADD  CONSTRAINT chk_chain_id_format
+  CHECK (chain_id ~ '^[a-z0-9]+:[a-zA-Z0-9]+$');
 
--- Create function to automatically add approval history
-CREATE OR REPLACE FUNCTION add_approval_history()
-RETURNS TRIGGER AS $$
+-- Type validation
+ALTER TABLE wallet_links
+  DROP CONSTRAINT IF EXISTS chk_wallet_type,
+  ADD  CONSTRAINT chk_wallet_type
+  CHECK (type IN ('eoa', 'contract', 'multisig', 'smart_account'));
+
+-- Unique constraint: one address per user per chain
+CREATE UNIQUE INDEX IF NOT EXISTS uq_wallet_user_address_chain 
+  ON wallet_links(user_id, address, chain_id);
+
+-- Only one primary wallet per user
+CREATE UNIQUE INDEX IF NOT EXISTS uq_wallet_primary 
+  ON wallet_links(user_id) 
+  WHERE is_primary = true;
+
+-- Indexes for queries
+CREATE INDEX IF NOT EXISTS idx_wallet_links_user_id ON wallet_links(user_id);
+CREATE INDEX IF NOT EXISTS idx_wallet_links_address ON wallet_links(address);
+CREATE INDEX IF NOT EXISTS idx_wallet_links_chain_id ON wallet_links(chain_id);
+CREATE INDEX IF NOT EXISTS idx_wallet_links_created_at ON wallet_links(created_at);
+
+-- ======================= WALLET ACTIVITY =======================
+CREATE TABLE IF NOT EXISTS wallet_activity (
+    id           uuid         PRIMARY KEY DEFAULT gen_random_uuid(),
+    wallet_id    uuid         NOT NULL REFERENCES wallet_links(wallet_id) ON DELETE CASCADE,
+    user_id      uuid         NOT NULL,
+    action       varchar(50)  NOT NULL,  -- linked, unlinked, set_primary, verified
+    metadata     jsonb,                  -- Additional activity metadata
+    ip_address   inet,
+    user_agent   text,
+    created_at   timestamptz  NOT NULL DEFAULT now()
+);
+
+-- Fallback for UUID generation
+DO $$
 BEGIN
-    INSERT INTO approvals_history (wallet_id, chain_id, operator, standard, approved, tx_hash, at)
-    VALUES (NEW.wallet_id, NEW.chain_id, NEW.operator, NEW.standard, NEW.approved, NEW.tx_hash, NOW());
-    RETURN NEW;
+  PERFORM gen_random_uuid();
+EXCEPTION WHEN undefined_function THEN
+  EXECUTE 'ALTER TABLE wallet_activity ALTER COLUMN id SET DEFAULT uuid_generate_v4()';
 END;
-$$ language 'plpgsql';
+$$;
 
--- Create trigger to automatically add approval history on insert/update
-CREATE TRIGGER add_approval_history_trigger
-    AFTER INSERT OR UPDATE ON approvals
-    FOR EACH ROW
-    EXECUTE FUNCTION add_approval_history();
+-- Action validation
+ALTER TABLE wallet_activity
+  DROP CONSTRAINT IF EXISTS chk_activity_action,
+  ADD  CONSTRAINT chk_activity_action
+  CHECK (action IN ('linked', 'unlinked', 'set_primary', 'verified', 'updated'));
 
--- Create function to ensure only one primary wallet per user per chain
+-- Indexes for activity queries
+CREATE INDEX IF NOT EXISTS idx_wallet_activity_wallet_id ON wallet_activity(wallet_id);
+CREATE INDEX IF NOT EXISTS idx_wallet_activity_user_id ON wallet_activity(user_id);
+CREATE INDEX IF NOT EXISTS idx_wallet_activity_created_at ON wallet_activity(created_at);
+CREATE INDEX IF NOT EXISTS idx_wallet_activity_action ON wallet_activity(action);
+
+-- ======================= WALLET VERIFICATION =======================
+CREATE TABLE IF NOT EXISTS wallet_verifications (
+    id               uuid         PRIMARY KEY DEFAULT gen_random_uuid(),
+    wallet_id        uuid         NOT NULL REFERENCES wallet_links(wallet_id) ON DELETE CASCADE,
+    verification_type varchar(50) NOT NULL,  -- signature, transaction, etc.
+    verification_data jsonb      NOT NULL,
+    status           varchar(20)  NOT NULL DEFAULT 'pending',
+    verified_at      timestamptz,
+    expires_at       timestamptz,
+    created_at       timestamptz  NOT NULL DEFAULT now()
+);
+
+-- Fallback for UUID generation
+DO $$
+BEGIN
+  PERFORM gen_random_uuid();
+EXCEPTION WHEN undefined_function THEN
+  EXECUTE 'ALTER TABLE wallet_verifications ALTER COLUMN id SET DEFAULT uuid_generate_v4()';
+END;
+$$;
+
+-- Status validation
+ALTER TABLE wallet_verifications
+  DROP CONSTRAINT IF EXISTS chk_verification_status,
+  ADD  CONSTRAINT chk_verification_status
+  CHECK (status IN ('pending', 'verified', 'failed', 'expired'));
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_wallet_verifications_wallet_id ON wallet_verifications(wallet_id);
+CREATE INDEX IF NOT EXISTS idx_wallet_verifications_status ON wallet_verifications(status);
+CREATE INDEX IF NOT EXISTS idx_wallet_verifications_expires_at ON wallet_verifications(expires_at);
+
+-- ======================= FUNCTIONS =======================
+
+-- Function to ensure only one primary wallet per user
 CREATE OR REPLACE FUNCTION ensure_single_primary_wallet()
 RETURNS TRIGGER AS $$
 BEGIN
-    IF NEW.is_primary = TRUE THEN
-        -- Unset other primary wallets for the same user and chain
-        UPDATE wallets 
-        SET is_primary = FALSE, updated_at = NOW()
-        WHERE user_id = NEW.user_id 
-          AND chain_id = NEW.chain_id 
-          AND id != NEW.id 
-          AND is_primary = TRUE;
+    IF NEW.is_primary = true THEN
+        -- Set all other wallets for this user to non-primary
+        UPDATE wallet_links
+        SET is_primary = false
+        WHERE user_id = NEW.user_id
+          AND wallet_id != NEW.wallet_id
+          AND is_primary = true;
     END IF;
     RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ LANGUAGE plpgsql;
 
--- Create trigger to ensure single primary wallet
-CREATE TRIGGER ensure_single_primary_wallet_trigger
-    BEFORE INSERT OR UPDATE ON wallets
+-- Trigger to ensure single primary wallet
+CREATE TRIGGER ensure_single_primary
+    BEFORE INSERT OR UPDATE OF is_primary ON wallet_links
     FOR EACH ROW
+    WHEN (NEW.is_primary = true)
     EXECUTE FUNCTION ensure_single_primary_wallet();
+
+-- Function to log wallet activity
+CREATE OR REPLACE FUNCTION log_wallet_activity()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_action varchar(50);
+    v_metadata jsonb;
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        v_action := 'linked';
+        v_metadata := jsonb_build_object(
+            'address', NEW.address,
+            'chain_id', NEW.chain_id,
+            'is_primary', NEW.is_primary
+        );
+    ELSIF TG_OP = 'UPDATE' THEN
+        IF OLD.is_primary != NEW.is_primary AND NEW.is_primary = true THEN
+            v_action := 'set_primary';
+        ELSE
+            v_action := 'updated';
+        END IF;
+        v_metadata := jsonb_build_object(
+            'old', jsonb_build_object('is_primary', OLD.is_primary, 'label', OLD.label),
+            'new', jsonb_build_object('is_primary', NEW.is_primary, 'label', NEW.label)
+        );
+    ELSIF TG_OP = 'DELETE' THEN
+        v_action := 'unlinked';
+        v_metadata := jsonb_build_object(
+            'address', OLD.address,
+            'chain_id', OLD.chain_id
+        );
+    END IF;
+
+    INSERT INTO wallet_activity (wallet_id, user_id, action, metadata)
+    VALUES (
+        COALESCE(NEW.wallet_id, OLD.wallet_id),
+        COALESCE(NEW.user_id, OLD.user_id),
+        v_action,
+        v_metadata
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger for wallet activity logging
+CREATE TRIGGER log_wallet_changes
+    AFTER INSERT OR UPDATE OR DELETE ON wallet_links
+    FOR EACH ROW
+    EXECUTE FUNCTION log_wallet_activity();
+
+-- ======================= COMMENTS =======================
+COMMENT ON TABLE wallet_links IS 'User wallet connections and metadata';
+COMMENT ON COLUMN wallet_links.account_id IS 'Account identifier (e.g., EOA address)';
+COMMENT ON COLUMN wallet_links.address IS 'Ethereum address in lowercase format';
+COMMENT ON COLUMN wallet_links.chain_id IS 'CAIP-2 chain identifier';
+COMMENT ON COLUMN wallet_links.type IS 'Wallet type: eoa, contract, multisig, smart_account';
+
+COMMENT ON TABLE wallet_activity IS 'Audit log of wallet-related actions';
+COMMENT ON TABLE wallet_verifications IS 'Wallet ownership verification records';
+
+COMMIT;
