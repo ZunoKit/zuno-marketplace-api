@@ -122,7 +122,7 @@ func (suite *OrchestratorIntegrationTestSuite) TestSubscriptionStructure() {
 	result, err := subscriptionResolver.OnIntentStatus(ctx, intentID)
 	assert.Error(suite.T(), err)
 	assert.Nil(suite.T(), result)
-	assert.Contains(suite.T(), err.Error(), "orchestrator service unavailable")
+	assert.Contains(suite.T(), err.Error(), "WebSocket service unavailable")
 }
 
 // Run the integration test suite

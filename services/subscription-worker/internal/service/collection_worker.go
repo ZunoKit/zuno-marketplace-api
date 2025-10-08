@@ -68,21 +68,24 @@ func (w *CollectionSubscriptionWorker) processCollectionDomainEvent(ctx context.
 	fmt.Printf("Processing collection domain event for %s on chain %s\n", event.CollectionAddress, event.ChainID)
 
 	// Find matching intent by chain ID and collection address
-	intent, err := w.intentRepo.FindByChainAndContract(ctx, event.ChainID, event.CollectionAddress, "collection")
+	intents, err := w.intentRepo.GetPendingIntentsByContract(ctx, event.ChainID, event.CollectionAddress)
 	if err != nil {
-		if err == domain.ErrIntentNotFound {
-			// This might be an external collection creation
-			fmt.Printf("No matching intent found for collection %s, might be external\n", event.CollectionAddress)
-			return nil
-		}
-		return fmt.Errorf("failed to find intent: %w", err)
+		return fmt.Errorf("failed to find intents: %w", err)
 	}
 
-	fmt.Printf("Found matching intent %s for collection %s\n", intent.ID, event.CollectionAddress)
+	if len(intents) == 0 {
+		// This might be an external collection creation
+		fmt.Printf("No matching intent found for collection %s, might be external\n", event.CollectionAddress)
+		return nil
+	}
+
+	// Use the first matching intent
+	intent := intents[0]
+	fmt.Printf("Found matching intent %s for collection %s\n", intent.IntentID, event.CollectionAddress)
 
 	// Update intent status to ready
-	statusUpdate := &domain.IntentStatusUpdate{
-		IntentID:        intent.ID,
+	statusUpdate := &domain.IntentStatus{
+		IntentID:        intent.IntentID,
 		Status:          "ready",
 		ChainID:         event.ChainID,
 		TxHash:          event.TxHash,
@@ -90,15 +93,9 @@ func (w *CollectionSubscriptionWorker) processCollectionDomainEvent(ctx context.
 		UpdatedAt:       time.Now(),
 	}
 
-	// Update status in cache
-	if err := w.statusCache.SetIntentStatus(ctx, statusUpdate); err != nil {
-		fmt.Printf("Failed to update intent status in cache: %v\n", err)
-		// Continue to send notification even if cache update fails
-	}
-
-	// Update intent in database
-	if err := w.intentRepo.UpdateIntentStatus(ctx, intent.ID, "ready"); err != nil {
-		fmt.Printf("Failed to update intent status in database: %v\n", err)
+	// Update status in cache and database
+	if err := w.intentRepo.UpdateIntentStatus(ctx, statusUpdate); err != nil {
+		fmt.Printf("Failed to update intent status: %v\n", err)
 		// Continue to send notification
 	}
 
@@ -113,15 +110,15 @@ func (w *CollectionSubscriptionWorker) processCollectionDomainEvent(ctx context.
 		// Don't fail the whole operation
 	}
 
-	fmt.Printf("Successfully processed collection creation for intent %s\n", intent.ID)
+	fmt.Printf("Successfully processed collection creation for intent %s\n", intent.IntentID)
 	return nil
 }
 
 // sendCollectionNotification sends a WebSocket notification for a completed collection
-func (w *CollectionSubscriptionWorker) sendCollectionNotification(ctx context.Context, intent *domain.Intent, event *CollectionDomainEvent) error {
+func (w *CollectionSubscriptionWorker) sendCollectionNotification(ctx context.Context, intent *domain.IntentStatus, event *CollectionDomainEvent) error {
 	// Prepare collection status payload
 	status := &CollectionStatus{
-		IntentID:        intent.ID,
+		IntentID:        intent.IntentID,
 		Status:          "ready",
 		ContractAddress: event.CollectionAddress,
 		TxHash:          event.TxHash,
@@ -134,25 +131,13 @@ func (w *CollectionSubscriptionWorker) sendCollectionNotification(ctx context.Co
 		Timestamp:       time.Now().Unix(),
 	}
 
-	// Send to WebSocket subscribers
-	notification := &WebSocketNotification{
-		Type:         "onCollectionStatus",
-		IntentID:     intent.ID,
-		Payload:      status,
-		SubscriberID: intent.CreatedBy, // Notify the creator
-	}
-
-	if err := w.wsPublisher.PublishToSubscriber(ctx, notification); err != nil {
-		return fmt.Errorf("failed to publish WebSocket notification: %w", err)
-	}
-
 	// Also publish to intent-specific channel
-	if err := w.wsPublisher.PublishToIntent(ctx, intent.ID, status); err != nil {
+	if err := w.wsPublisher.PublishToIntent(ctx, intent.IntentID, status); err != nil {
 		fmt.Printf("Failed to publish to intent channel: %v\n", err)
 		// Don't fail the whole operation
 	}
 
-	fmt.Printf("Sent collection notification for intent %s to user %s\n", intent.ID, intent.CreatedBy)
+	fmt.Printf("Sent collection notification for intent %s\n", intent.IntentID)
 	return nil
 }
 
@@ -180,23 +165,10 @@ func (w *CollectionSubscriptionWorker) publishCollectionReady(ctx context.Contex
 
 // HandleCollectionSubscription handles a new WebSocket subscription for collection status
 func (w *CollectionSubscriptionWorker) HandleCollectionSubscription(ctx context.Context, intentID, subscriberID string) error {
-	// Check current status from cache
-	status, err := w.statusCache.GetIntentStatus(ctx, intentID)
+	// Check current status from cache or database
+	status, err := w.intentRepo.GetIntentStatus(ctx, intentID)
 	if err != nil {
-		// Status not in cache, check database
-		intent, err := w.intentRepo.GetIntent(ctx, intentID)
-		if err != nil {
-			return fmt.Errorf("intent not found: %w", err)
-		}
-
-		// Create status from intent
-		status = &domain.IntentStatusUpdate{
-			IntentID:        intent.ID,
-			Status:          intent.Status,
-			ChainID:         intent.ChainID,
-			TxHash:          intent.TxHash,
-			ContractAddress: intent.ContractAddress,
-		}
+		return fmt.Errorf("intent not found: %w", err)
 	}
 
 	// Send current status immediately
@@ -209,14 +181,8 @@ func (w *CollectionSubscriptionWorker) HandleCollectionSubscription(ctx context.
 		Timestamp:       time.Now().Unix(),
 	}
 
-	notification := &WebSocketNotification{
-		Type:         "onCollectionStatus",
-		IntentID:     intentID,
-		Payload:      collectionStatus,
-		SubscriberID: subscriberID,
-	}
-
-	if err := w.wsPublisher.PublishToSubscriber(ctx, notification); err != nil {
+	// Publish to intent channel
+	if err := w.wsPublisher.PublishToIntent(ctx, intentID, collectionStatus); err != nil {
 		return fmt.Errorf("failed to send initial status: %w", err)
 	}
 
@@ -233,24 +199,37 @@ func (w *CollectionSubscriptionWorker) HandleCollectionSubscription(ctx context.
 func (w *CollectionSubscriptionWorker) ProcessCollectionIndexedEvent(ctx context.Context, event *CollectionIndexedEvent) error {
 	fmt.Printf("Processing collection indexed event for %s\n", event.CollectionAddress)
 
-	// Find the related intent
-	intent, err := w.intentRepo.FindByChainAndContract(ctx, event.ChainID, event.CollectionAddress, "collection")
+	// Find the related intents
+	intents, err := w.intentRepo.GetPendingIntentsByContract(ctx, event.ChainID, event.CollectionAddress)
 	if err != nil {
-		if err == domain.ErrIntentNotFound {
-			// External collection, skip
-			return nil
-		}
-		return fmt.Errorf("failed to find intent: %w", err)
+		return fmt.Errorf("failed to find intents: %w", err)
 	}
 
+	if len(intents) == 0 {
+		// External collection, skip
+		fmt.Printf("No matching intent found for collection %s\n", event.CollectionAddress)
+		return nil
+	}
+
+	// Use the first matching intent
+	intent := intents[0]
+
 	// Update intent status to "indexed"
-	if err := w.intentRepo.UpdateIntentStatus(ctx, intent.ID, "indexed"); err != nil {
+	statusUpdate := &domain.IntentStatus{
+		IntentID:        intent.IntentID,
+		Status:          "indexed",
+		ChainID:         event.ChainID,
+		ContractAddress: event.CollectionAddress,
+		UpdatedAt:       time.Now(),
+	}
+
+	if err := w.intentRepo.UpdateIntentStatus(ctx, statusUpdate); err != nil {
 		fmt.Printf("Failed to update intent status: %v\n", err)
 	}
 
 	// Send notification about indexing completion
 	status := &CollectionStatus{
-		IntentID:        intent.ID,
+		IntentID:        intent.IntentID,
 		Status:          "indexed",
 		ContractAddress: event.CollectionAddress,
 		ChainID:         event.ChainID,
@@ -259,14 +238,7 @@ func (w *CollectionSubscriptionWorker) ProcessCollectionIndexedEvent(ctx context
 		Timestamp:       time.Now().Unix(),
 	}
 
-	notification := &WebSocketNotification{
-		Type:         "onCollectionIndexed",
-		IntentID:     intent.ID,
-		Payload:      status,
-		SubscriberID: intent.CreatedBy,
-	}
-
-	return w.wsPublisher.PublishToSubscriber(ctx, notification)
+	return w.wsPublisher.PublishToIntent(ctx, intent.IntentID, status)
 }
 
 // Domain event structures

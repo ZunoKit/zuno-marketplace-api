@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: subscription-worker
+  namespace: dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: subscription-worker
+  template:
+    metadata:
+      labels:
+        app: subscription-worker
+    spec:
+      containers:
+        - name: subscription-worker
+          image: nft-marketplace/subscription-worker
+          env:
+            - name: POSTGRES_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: nft-config
+                  key: POSTGRES_HOST
+            - name: POSTGRES_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: nft-config
+                  key: POSTGRES_PORT
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: nft-config
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nft-secrets
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: nft-config
+                  key: POSTGRES_DATABASE
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: nft-config
+                  key: REDIS_HOST
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: nft-config
+                  key: REDIS_PORT
+            - name: RABBITMQ_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: nft-config
+                  key: RABBITMQ_HOST
+            - name: RABBITMQ_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: nft-config
+                  key: RABBITMQ_PORT
+            - name: RABBITMQ_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: nft-config
+                  key: RABBITMQ_USER
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nft-secrets
+                  key: RABBITMQ_PASSWORD
+            - name: RABBITMQ_EXCHANGE
+              valueFrom:
+                configMapKeyRef:
+                  name: nft-config
+                  key: RABBITMQ_EXCHANGE

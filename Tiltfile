@@ -363,10 +363,8 @@ docker_build_with_restart(
   ],
 )
 
-# Note: subscription-worker doesn't need k8s_yaml as it's a worker, not a service
-# If you have k8s deployment for it, add:
-# k8s_yaml('./infra/development/k8s/subscription-worker-deployment.yaml')
-# k8s_resource('subscription-worker', resource_deps=['subscription-worker-compile', 'postgres', 'redis', 'rabbitmq'], labels="workers")
+k8s_yaml('./infra/development/k8s/subscription-worker-deployment.yaml')
+k8s_resource('subscription-worker', resource_deps=['subscription-worker-compile', 'postgres', 'redis', 'rabbitmq'], labels="workers")
 
 ### End of Subscription Worker ###
 

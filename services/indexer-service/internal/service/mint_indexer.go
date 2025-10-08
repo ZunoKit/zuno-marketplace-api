@@ -472,9 +472,6 @@ type MintEvent struct {
 
 // publishMintEvent publishes a mint event to RabbitMQ
 func (mi *MintIndexer) publishMintEvent(ctx context.Context, chainID string, event *MintEvent) error {
-	// Publish to RabbitMQ with routing key: minted.eip155-{chainId}
-	routingKey := fmt.Sprintf("minted.eip155-%s", strings.TrimPrefix(chainID, "eip155-"))
-
 	message := map[string]interface{}{
 		"schema":    "v1",
 		"event_id":  fmt.Sprintf("%s-%s-%s", event.TxHash, event.Contract, event.TokenID),
@@ -493,5 +490,10 @@ func (mi *MintIndexer) publishMintEvent(ctx context.Context, chainID string, eve
 		message["batch_index"] = *event.BatchIndex
 	}
 
-	return mi.service.publisher.PublishMintEvent(ctx, "mints.events", routingKey, message)
+	// Publish as a generic collection event with mint routing
+	publishableEvent := &domain.PublishableEvent{
+		EventType: "mint.indexed",
+		Data:      message,
+	}
+	return mi.service.publisher.PublishCollectionEvent(ctx, event.ChainID, publishableEvent)
 }

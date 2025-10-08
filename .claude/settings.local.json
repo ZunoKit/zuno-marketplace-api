@@ -14,7 +14,14 @@
       "Bash(goimports:*)",
       "Bash(mkdir:*)",
       "Bash(git mv:*)",
-      "Bash(git filter-branch:*)"
+      "Bash(git filter-branch:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(golangci-lint run:*)",
+      "Bash(dir /B infra\\development\\k8s\\)",
+      "Bash(dir infradevelopmentk8s)",
+      "Bash(dir infradevelopment)",
+      "Bash(test:*)",
+      "Bash(cp:*)"
     ],
     "deny": [],
     "ask": []

@@ -25,21 +25,6 @@ type Intent struct {
 	UpdatedAt       time.Time
 }
 
-// IntentRepository defines the interface for intent storage
-type IntentRepository interface {
-	// GetIntent retrieves an intent by ID
-	GetIntent(ctx context.Context, intentID string) (*Intent, error)
-
-	// FindByChainAndTxHash finds an intent by chain ID and transaction hash
-	FindByChainAndTxHash(ctx context.Context, chainID, txHash, kind string) (*Intent, error)
-
-	// FindByChainAndContract finds an intent by chain ID and contract address
-	FindByChainAndContract(ctx context.Context, chainID, contractAddress, kind string) (*Intent, error)
-
-	// UpdateIntentStatus updates the status of an intent
-	UpdateIntentStatus(ctx context.Context, intentID, status string) error
-}
-
 // IntentStatusUpdate represents an intent status update
 type IntentStatusUpdate struct {
 	IntentID        string

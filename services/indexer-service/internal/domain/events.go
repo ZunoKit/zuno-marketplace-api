@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"crypto/sha256"
 	"encoding/hex"
 	"strings"
 
@@ -127,15 +126,6 @@ func IsKnownEvent(signature string) bool {
 }
 
 // Event data structures for parsed events
-
-// CollectionCreatedEvent represents a parsed CollectionCreated event
-type CollectionCreatedEvent struct {
-	CollectionAddress string `json:"collection_address"`
-	Creator           string `json:"creator"`
-	Name              string `json:"name"`
-	Symbol            string `json:"symbol"`
-	Timestamp         uint64 `json:"timestamp"`
-}
 
 // CollectionMintedEvent represents a parsed CollectionMinted event
 type CollectionMintedEvent struct {

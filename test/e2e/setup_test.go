@@ -30,10 +30,12 @@ func (suite *E2ETestSuite) SetupSuite() {
 	)
 
 	// Start all services
-	err := suite.compose.
+	execErr := suite.compose.
 		WithCommand([]string{"up", "-d"}).
 		Invoke()
-	suite.Require().NoError(err)
+	if execErr.Error != nil {
+		suite.Require().NoError(execErr.Error)
+	}
 
 	// Wait for services to be ready
 	suite.waitForServices()
@@ -54,8 +56,10 @@ func (suite *E2ETestSuite) SetupSuite() {
 
 func (suite *E2ETestSuite) TearDownSuite() {
 	// Stop and remove containers
-	err := suite.compose.Down()
-	suite.Require().NoError(err)
+	execErr := suite.compose.Down()
+	if execErr.Error != nil {
+		suite.Require().NoError(execErr.Error)
+	}
 }
 
 func (suite *E2ETestSuite) waitForServices() {

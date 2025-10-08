@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: graphql-gateway
+  namespace: dev
+spec:
+  ports:
+    - port: 8081
+      targetPort: 8081
+  selector:
+    app: graphql-gateway
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: graphql-gateway
+  namespace: dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: graphql-gateway
+  template:
+    metadata:
+      labels:
+        app: graphql-gateway
+    spec:
+      containers:
+        - name: graphql-gateway
+          image: nft-marketplace/graphql-gateway
+          ports:
+            - containerPort: 8081
+          env:
+            - name: GATEWAY_HTTP_ADDR
+              value: ":8081"
+            - name: AUTH_SERVICE_URL
+              value: "auth-service:50051"
+            - name: USER_SERVICE_URL
+              value: "user-service:50052"
+            - name: WALLET_SERVICE_URL
+              value: "wallet-service:50053"
+            - name: MEDIA_SERVICE_URL
+              value: "media-service:50055"
+            - name: CHAIN_REGISTRY_SERVICE_URL
+              value: "chain-registry-service:50056"
+            - name: ORCHESTRATOR_SERVICE_URL
+              value: "orchestrator-service:50054"
+            - name: CATALOG_SERVICE_URL
+              value: "catalog-service:50057"
+            - name: INDEXER_SERVICE_URL
+              value: "indexer-service:50058"
+            - name: RABBITMQ_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: nft-config
+                  key: RABBITMQ_HOST
+            - name: RABBITMQ_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: nft-config
+                  key: RABBITMQ_PORT
+            - name: RABBITMQ_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: nft-config
+                  key: RABBITMQ_USER
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nft-secrets
+                  key: RABBITMQ_PASSWORD
+            - name: RABBITMQ_EXCHANGE
+              valueFrom:
+                configMapKeyRef:
+                  name: nft-config
+                  key: RABBITMQ_EXCHANGE

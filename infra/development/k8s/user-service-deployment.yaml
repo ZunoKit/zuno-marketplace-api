@@ -1,0 +1,95 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service
+  namespace: dev
+spec:
+  ports:
+    - port: 50052
+      targetPort: 50052
+  selector:
+    app: user-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service
+  namespace: dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: user-service
+  template:
+    metadata:
+      labels:
+        app: user-service
+    spec:
+      containers:
+        - name: user-service
+          image: nft-marketplace/user-service
+          ports:
+            - containerPort: 50052
+          env:
+            - name: USER_GRPC_PORT
+              value: ":50052"
+            - name: POSTGRES_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: nft-config
+                  key: POSTGRES_HOST
+            - name: POSTGRES_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: nft-config
+                  key: POSTGRES_PORT
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: nft-config
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nft-secrets
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: nft-config
+                  key: POSTGRES_DATABASE
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: nft-config
+                  key: REDIS_HOST
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: nft-config
+                  key: REDIS_PORT
+            - name: RABBITMQ_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: nft-config
+                  key: RABBITMQ_HOST
+            - name: RABBITMQ_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: nft-config
+                  key: RABBITMQ_PORT
+            - name: RABBITMQ_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: nft-config
+                  key: RABBITMQ_USER
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nft-secrets
+                  key: RABBITMQ_PASSWORD
+            - name: RABBITMQ_EXCHANGE
+              valueFrom:
+                configMapKeyRef:
+                  name: nft-config
+                  key: RABBITMQ_EXCHANGE
