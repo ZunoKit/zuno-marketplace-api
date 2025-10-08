@@ -1,0 +1,3 @@
+@echo off
+echo Building PostgreSQL with initial schemas...
+docker build -f infra\development\docker\postgres.dockerfile -t nft-postgres:latest .
