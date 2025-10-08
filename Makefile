@@ -14,68 +14,71 @@ generate-proto:
 gql:
 	go get github.com/99designs/gqlgen
 
-.PHONY: fmt
-fmt:
-	gofmt -s -w .
-	goimports -w .
-
-.PHONY: lint
-lint:
-	golangci-lint run
+# ============================================================================
+# Testing Commands
+# ============================================================================
 
 .PHONY: test
-test:
-	go test -v -race -coverprofile=coverage.out ./...
+test: ## Run all tests
+	@echo "Running all tests..."
+	@$(MAKE) test-unit
+	@$(MAKE) test-integration
+
+.PHONY: test-unit
+test-unit: ## Run unit tests for all services
+	@echo "Running unit tests..."
+	@go test -v -race -cover ./services/*/test/unit/...
+
+.PHONY: test-integration
+test-integration: ## Run integration tests for all services
+	@echo "Running integration tests..."
+	@go test -v -race -cover ./services/*/test/integration/...
+
+.PHONY: test-e2e
+test-e2e: ## Run end-to-end tests
+	@echo "Running e2e tests..."
+	@docker-compose up -d
+	@sleep 10  # Wait for services to start
+	@go test -v -race -cover ./test/e2e/...
+	@docker-compose down
+
+.PHONY: test-service
+test-service: ## Run tests for a specific service (usage: make test-service SERVICE=auth-service)
+	@echo "Running tests for $(SERVICE)..."
+	@go test -v -race -cover ./services/$(SERVICE)/test/...
 
 .PHONY: test-coverage
-test-coverage: test
-	go tool cover -html=coverage.out -o coverage.html
+test-coverage: ## Generate test coverage report
+	@echo "Generating test coverage report..."
+	@go test -v -race -coverprofile=coverage.out ./...
+	@go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated: coverage.html"
+
+.PHONY: test-coverage-service
+test-coverage-service: ## Generate test coverage for a specific service
+	@echo "Generating test coverage for $(SERVICE)..."
+	@go test -v -race -coverprofile=coverage-$(SERVICE).out ./services/$(SERVICE)/...
+	@go tool cover -html=coverage-$(SERVICE).out -o coverage-$(SERVICE).html
+	@echo "Coverage report generated: coverage-$(SERVICE).html"
+
+.PHONY: test-benchmark
+test-benchmark: ## Run benchmark tests
+	@echo "Running benchmark tests..."
+	@go test -bench=. -benchmem ./...
+
+.PHONY: test-watch
+test-watch: ## Run tests in watch mode
+	@echo "Running tests in watch mode..."
+	@gotestsum --watch -- -v -race ./...
+
+.PHONY: test-clean
+test-clean: ## Clean test artifacts
+	@echo "Cleaning test artifacts..."
+	@rm -f coverage*.out coverage*.html
+	@rm -rf test-results/
+	@echo "Test artifacts cleaned"
 
 .PHONY: deps
 deps:
 	go mod download
 	go mod tidy
-
-.PHONY: install-tools
-install-tools:
-	go install golang.org/x/tools/cmd/goimports@latest
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-
-.PHONY: build-all
-build-all:
-	@for service in auth-service catalog-service chain-registry-service graphql-gateway media-service orchestrator-service user-service indexer-service subscription-worker; do \
-		echo "Building $$service..."; \
-		if [ -f "services/$$service/cmd/main.go" ]; then \
-			cd services/$$service && go build -o bin/$$service cmd/main.go && cd ../..; \
-		elif [ -f "services/$$service/main.go" ]; then \
-			cd services/$$service && go build -o bin/$$service main.go && cd ../..; \
-		else \
-			echo "No main.go found for $$service"; \
-		fi; \
-	done
-
-.PHONY: clean
-clean:
-	@for service in auth-service catalog-service chain-registry-service graphql-gateway media-service orchestrator-service user-service indexer-service subscription-worker; do \
-		if [ -d "services/$$service/bin" ]; then \
-			rm -rf services/$$service/bin; \
-		fi; \
-	done
-	rm -f coverage.out coverage.html
-
-.PHONY: help
-help:
-	@echo "Available commands:"
-	@echo "  generate-proto  Generate protobuf files"
-	@echo "  gql            Install gqlgen"
-	@echo "  fmt            Format Go code"
-	@echo "  lint           Run linter"
-	@echo "  test           Run tests with coverage"
-	@echo "  test-coverage  Run tests and generate HTML coverage report"
-	@echo "  deps           Download and tidy dependencies"
-	@echo "  install-tools  Install development tools"
-	@echo "  build-all      Build all services"
-	@echo "  clean          Clean build artifacts"
-	@echo "  help           Show this help message"
-
-
