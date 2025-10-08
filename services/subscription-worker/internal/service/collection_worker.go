@@ -313,10 +313,4 @@ type CollectionStatus struct {
 	Timestamp       int64  `json:"timestamp"`
 }
 
-// WebSocketNotification represents a WebSocket notification
-type WebSocketNotification struct {
-	Type         string      `json:"type"`
-	IntentID     string      `json:"intent_id"`
-	Payload      interface{} `json:"payload"`
-	SubscriberID string      `json:"subscriber_id"`
-}
+// WebSocketNotification is defined in mint_worker.go to avoid duplication

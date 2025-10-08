@@ -64,13 +64,7 @@ type MediaInfo struct {
 	Processed    bool   `json:"processed" bson:"processed"`
 }
 
-// ProcessedEvent represents a processed event for idempotency
-type ProcessedEvent struct {
-	ID          string    `json:"id" bson:"_id"`
-	EventID     string    `json:"event_id" bson:"event_id"`
-	TxHash      string    `json:"tx_hash" bson:"tx_hash"`
-	ProcessedAt time.Time `json:"processed_at" bson:"processed_at"`
-}
+// ProcessedEvent is defined in domain.go to avoid duplication
 
 // NFTFilter represents filter criteria for listing NFTs
 type NFTFilter struct {
