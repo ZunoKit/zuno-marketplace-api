@@ -53,7 +53,6 @@ dist-ssr
 *.sln
 *.sw?
 
-
 # Tilt build
 build/
 
@@ -62,6 +61,8 @@ build/
 
 # Secrets
 secrets.yaml
+!infra/development/build/
+!infra\development\build\*.bat
 
 .quoder
 zuno-marketplace-contracts
