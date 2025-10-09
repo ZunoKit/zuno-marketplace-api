@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log"
 	"math/big"
 	"strconv"
 	"strings"
@@ -38,25 +39,25 @@ func NewCatalogService(
 
 // HandleCollectionCreated handles collection creation events
 func (s *CatalogService) HandleCollectionCreated(ctx context.Context, evt *domain.CollectionEvent) error {
-	// Check if event has already been processed
-	processed, err := s.processedEventRepo.MarkProcessed(ctx, evt.EventID)
-	if err != nil {
-		return fmt.Errorf("failed to check if event is processed: %w", err)
-	}
-
-	if !processed {
-		// Event already processed, skip
-		return nil
-	}
-
-	// Extract collection data from event
+	// Extract collection data from event first (before transaction)
 	collection, err := s.extractCollectionFromEvent(evt)
 	if err != nil {
 		return fmt.Errorf("failed to extract collection from event: %w", err)
 	}
 
-	// Use unit of work to ensure data consistency
+	// Use unit of work to ensure data consistency - ALL operations in one transaction
 	err = s.unitOfWork.WithinTx(ctx, func(ctx context.Context, tx domain.Tx) error {
+		// Check if event has already been processed (INSIDE transaction)
+		processed, err := tx.ProcessedEventsRepo().MarkProcessed(ctx, evt.EventID)
+		if err != nil {
+			return fmt.Errorf("failed to check if event is processed: %w", err)
+		}
+
+		if !processed {
+			// Event already processed, skip (but don't error - idempotent)
+			return nil
+		}
+
 		// Upsert collection
 		created, err := tx.CollectionsRepo().Upsert(ctx, collection)
 		if err != nil {
@@ -64,9 +65,13 @@ func (s *CatalogService) HandleCollectionCreated(ctx context.Context, evt *domai
 		}
 
 		// Publish domain event - always publish "upserted" per CREATE.md line 74
+		// Note: This should ideally be done after transaction commits
+		// to avoid publishing events for failed transactions
 		err = s.publishCollectionUpsertedEvent(ctx, &collection, created)
 		if err != nil {
-			return fmt.Errorf("failed to publish domain event: %w", err)
+			// Log error but don't fail transaction - events are eventually consistent
+			// In production, use outbox pattern for transactional messaging
+			log.Printf("Warning: failed to publish collection upserted event: %v", err)
 		}
 
 		return nil

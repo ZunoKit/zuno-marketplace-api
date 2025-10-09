@@ -16,6 +16,8 @@ type Config struct {
 	ChainRegistryServiceURL string
 	OrchestratorServiceURL  string
 	SubscriptionWorkerWSURL string
+	MaxQueryComplexity      int // Maximum allowed query complexity
+	MaxQueryDepth           int // Maximum allowed query depth
 }
 
 // LoadConfig loads configuration from environment variables
@@ -31,6 +33,8 @@ func LoadConfig() *Config {
 		ChainRegistryServiceURL: env.GetString("CHAIN_REGISTRY_SERVICE_URL", "chain-registry-service:50056"),
 		OrchestratorServiceURL:  env.GetString("ORCHESTRATOR_SERVICE_URL", "orchestrator-service:50054"),
 		SubscriptionWorkerWSURL: env.GetString("SUBSCRIPTION_WORKER_WS_URL", "ws://subscription-worker:8080/ws"),
+		MaxQueryComplexity:      env.GetInt("MAX_QUERY_COMPLEXITY", 1000),
+		MaxQueryDepth:           env.GetInt("MAX_QUERY_DEPTH", 10),
 	}
 
 	log.Printf("GraphQL Gateway config loaded - HTTP: %s, Orchestrator: %s",

@@ -1,0 +1,215 @@
+# Kubernetes manifests for TLS certificates
+# This should be generated from actual certificates using:
+# kubectl create secret tls grpc-tls-certs --cert=path/to/cert --key=path/to/key
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ca-certificates
+  namespace: dev
+data:
+  ca.crt: |
+    # CA certificate content will be inserted here
+    # This is a placeholder - actual certificate should be generated and inserted
+    -----BEGIN CERTIFICATE-----
+    # ... CA certificate content ...
+    -----END CERTIFICATE-----
+
+---
+# Secret for auth-service TLS certificates
+apiVersion: v1
+kind: Secret
+metadata:
+  name: auth-service-tls
+  namespace: dev
+type: kubernetes.io/tls
+data:
+  tls.crt: # base64 encoded certificate
+  tls.key: # base64 encoded private key
+
+---
+# Secret for user-service TLS certificates
+apiVersion: v1
+kind: Secret
+metadata:
+  name: user-service-tls
+  namespace: dev
+type: kubernetes.io/tls
+data:
+  tls.crt: # base64 encoded certificate
+  tls.key: # base64 encoded private key
+
+---
+# Secret for wallet-service TLS certificates
+apiVersion: v1
+kind: Secret
+metadata:
+  name: wallet-service-tls
+  namespace: dev
+type: kubernetes.io/tls
+data:
+  tls.crt: # base64 encoded certificate
+  tls.key: # base64 encoded private key
+
+---
+# Secret for orchestrator-service TLS certificates
+apiVersion: v1
+kind: Secret
+metadata:
+  name: orchestrator-service-tls
+  namespace: dev
+type: kubernetes.io/tls
+data:
+  tls.crt: # base64 encoded certificate
+  tls.key: # base64 encoded private key
+
+---
+# Secret for media-service TLS certificates
+apiVersion: v1
+kind: Secret
+metadata:
+  name: media-service-tls
+  namespace: dev
+type: kubernetes.io/tls
+data:
+  tls.crt: # base64 encoded certificate
+  tls.key: # base64 encoded private key
+
+---
+# Secret for chain-registry-service TLS certificates
+apiVersion: v1
+kind: Secret
+metadata:
+  name: chain-registry-service-tls
+  namespace: dev
+type: kubernetes.io/tls
+data:
+  tls.crt: # base64 encoded certificate
+  tls.key: # base64 encoded private key
+
+---
+# Secret for catalog-service TLS certificates
+apiVersion: v1
+kind: Secret
+metadata:
+  name: catalog-service-tls
+  namespace: dev
+type: kubernetes.io/tls
+data:
+  tls.crt: # base64 encoded certificate
+  tls.key: # base64 encoded private key
+
+---
+# Secret for indexer-service TLS certificates
+apiVersion: v1
+kind: Secret
+metadata:
+  name: indexer-service-tls
+  namespace: dev
+type: kubernetes.io/tls
+data:
+  tls.crt: # base64 encoded certificate
+  tls.key: # base64 encoded private key
+
+---
+# Secret for graphql-gateway TLS certificates (server)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: graphql-gateway-tls
+  namespace: dev
+type: kubernetes.io/tls
+data:
+  tls.crt: # base64 encoded certificate
+  tls.key: # base64 encoded private key
+
+---
+# Secret for graphql-gateway client certificates
+apiVersion: v1
+kind: Secret
+metadata:
+  name: graphql-gateway-client-tls
+  namespace: dev
+type: Opaque
+data:
+  client.crt: # base64 encoded client certificate
+  client.key: # base64 encoded client private key
+
+---
+# Script to generate and apply certificates
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cert-generator-script
+  namespace: dev
+data:
+  generate-and-apply.sh: |
+    #!/bin/bash
+    
+    # This script generates certificates and creates Kubernetes secrets
+    # Run this on your local machine with kubectl access
+    
+    CERT_DIR="./certs-temp"
+    mkdir -p $CERT_DIR
+    
+    # Generate CA
+    openssl genpkey -algorithm RSA -out $CERT_DIR/ca.key -pkeyopt rsa_keygen_bits:4096
+    openssl req -new -x509 -days 3650 -key $CERT_DIR/ca.key -out $CERT_DIR/ca.crt \
+      -subj "/C=US/ST=CA/L=San Francisco/O=Zuno Marketplace/OU=Engineering/CN=Zuno Marketplace CA"
+    
+    # Create CA ConfigMap
+    kubectl create configmap ca-certificates --from-file=ca.crt=$CERT_DIR/ca.crt -n dev --dry-run=client -o yaml | kubectl apply -f -
+    
+    # Services list
+    SERVICES="auth-service user-service wallet-service orchestrator-service media-service chain-registry-service catalog-service indexer-service graphql-gateway"
+    
+    for SERVICE in $SERVICES; do
+      # Generate service certificate
+      openssl genpkey -algorithm RSA -out $CERT_DIR/$SERVICE.key -pkeyopt rsa_keygen_bits:4096
+      openssl req -new -key $CERT_DIR/$SERVICE.key -out $CERT_DIR/$SERVICE.csr \
+        -subj "/C=US/ST=CA/L=San Francisco/O=Zuno Marketplace/OU=Engineering/CN=$SERVICE.zuno-marketplace.local"
+      
+      # Create extensions
+      cat > $CERT_DIR/$SERVICE.ext <<EOF
+    subjectAltName = DNS:$SERVICE,DNS:$SERVICE.dev.svc.cluster.local,DNS:localhost,IP:127.0.0.1
+    keyUsage = digitalSignature, keyEncipherment
+    extendedKeyUsage = serverAuth
+    EOF
+      
+      # Sign with CA
+      openssl x509 -req -in $CERT_DIR/$SERVICE.csr -CA $CERT_DIR/ca.crt -CAkey $CERT_DIR/ca.key \
+        -CAcreateserial -out $CERT_DIR/$SERVICE.crt -days 3650 -extfile $CERT_DIR/$SERVICE.ext
+      
+      # Create Kubernetes secret
+      kubectl create secret tls $SERVICE-tls \
+        --cert=$CERT_DIR/$SERVICE.crt \
+        --key=$CERT_DIR/$SERVICE.key \
+        -n dev --dry-run=client -o yaml | kubectl apply -f -
+      
+      # Clean up temp files
+      rm $CERT_DIR/$SERVICE.csr $CERT_DIR/$SERVICE.ext
+    done
+    
+    # Generate client certificate for gateway
+    openssl genpkey -algorithm RSA -out $CERT_DIR/client.key -pkeyopt rsa_keygen_bits:4096
+    openssl req -new -key $CERT_DIR/client.key -out $CERT_DIR/client.csr \
+      -subj "/C=US/ST=CA/L=San Francisco/O=Zuno Marketplace/OU=Engineering/CN=graphql-gateway-client"
+    
+    cat > $CERT_DIR/client.ext <<EOF
+    keyUsage = digitalSignature, keyEncipherment
+    extendedKeyUsage = clientAuth
+    EOF
+    
+    openssl x509 -req -in $CERT_DIR/client.csr -CA $CERT_DIR/ca.crt -CAkey $CERT_DIR/ca.key \
+      -CAcreateserial -out $CERT_DIR/client.crt -days 3650 -extfile $CERT_DIR/client.ext
+    
+    # Create client secret
+    kubectl create secret generic graphql-gateway-client-tls \
+      --from-file=client.crt=$CERT_DIR/client.crt \
+      --from-file=client.key=$CERT_DIR/client.key \
+      -n dev --dry-run=client -o yaml | kubectl apply -f -
+    
+    # Clean up
+    rm -rf $CERT_DIR
+    
+    echo "Certificates generated and applied to Kubernetes!"

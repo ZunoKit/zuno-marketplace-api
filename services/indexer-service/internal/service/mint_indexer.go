@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -406,15 +407,36 @@ func (mi *MintIndexer) parseERC1155TransferSingle(log *domain.Log) (*domain.Tran
 		return nil, fmt.Errorf("invalid ERC1155 TransferSingle event topics")
 	}
 
-	// Decode data field for id and value
-	// This would need proper ABI decoding in production
-	// For now, using simplified parsing
+	// Topics contain indexed parameters
+	operator := mi.topicToAddress(log.Topics[1])
+	from := mi.topicToAddress(log.Topics[2])
+	to := mi.topicToAddress(log.Topics[3])
+
+	// Decode data field for id and value (non-indexed parameters)
+	data, err := hex.DecodeString(strings.TrimPrefix(log.Data, "0x"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode log data: %w", err)
+	}
+
+	// ERC1155 TransferSingle data contains:
+	// - bytes 0-32: uint256 id
+	// - bytes 32-64: uint256 value
+	if len(data) < 64 {
+		return nil, fmt.Errorf("invalid data length for TransferSingle: expected at least 64 bytes, got %d", len(data))
+	}
+
+	// Parse ID (first 32 bytes)
+	id := new(big.Int).SetBytes(data[0:32])
+
+	// Parse Value (second 32 bytes)
+	value := new(big.Int).SetBytes(data[32:64])
+
 	return &domain.TransferSingleEvent{
-		Operator: mi.topicToAddress(log.Topics[1]),
-		From:     mi.topicToAddress(log.Topics[2]),
-		To:       mi.topicToAddress(log.Topics[3]),
-		ID:       "0", // Would be decoded from log.Data
-		Value:    "1", // Would be decoded from log.Data
+		Operator: operator,
+		From:     from,
+		To:       to,
+		ID:       id.String(),
+		Value:    value.String(),
 	}, nil
 }
 
@@ -423,14 +445,29 @@ func (mi *MintIndexer) parseERC1155TransferBatch(log *domain.Log) (*domain.Trans
 		return nil, fmt.Errorf("invalid ERC1155 TransferBatch event topics")
 	}
 
-	// Decode data field for ids and values arrays
-	// This would need proper ABI decoding in production
+	// Topics contain indexed parameters
+	operator := mi.topicToAddress(log.Topics[1])
+	from := mi.topicToAddress(log.Topics[2])
+	to := mi.topicToAddress(log.Topics[3])
+
+	// Decode data field for ids and values arrays (non-indexed parameters)
+	data, err := hex.DecodeString(strings.TrimPrefix(log.Data, "0x"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode log data: %w", err)
+	}
+
+	// Parse dynamic arrays using ABI decoding
+	ids, values, err := mi.decodeERC1155BatchData(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode batch data: %w", err)
+	}
+
 	return &domain.TransferBatchEvent{
-		Operator: mi.topicToAddress(log.Topics[1]),
-		From:     mi.topicToAddress(log.Topics[2]),
-		To:       mi.topicToAddress(log.Topics[3]),
-		IDs:      []string{"0"}, // Would be decoded from log.Data
-		Values:   []string{"1"}, // Would be decoded from log.Data
+		Operator: operator,
+		From:     from,
+		To:       to,
+		IDs:      ids,
+		Values:   values,
 	}, nil
 }
 
@@ -454,6 +491,65 @@ func (mi *MintIndexer) topicToUint256(topic string) string {
 func (mi *MintIndexer) isZeroAddress(addr string) bool {
 	addr = strings.ToLower(strings.TrimPrefix(addr, "0x"))
 	return addr == "" || addr == "0" || addr == strings.Repeat("0", 40)
+}
+
+// decodeERC1155BatchData decodes the data field of TransferBatch event
+func (mi *MintIndexer) decodeERC1155BatchData(data []byte) ([]string, []string, error) {
+	if len(data) < 64 {
+		return nil, nil, fmt.Errorf("data too short for batch transfer")
+	}
+
+	// The data contains two dynamic arrays: uint256[] ids and uint256[] values
+	// Layout:
+	// 0x00-0x20: offset to ids array
+	// 0x20-0x40: offset to values array
+	// ids array data...
+	// values array data...
+
+	// Read offsets
+	idsOffset := new(big.Int).SetBytes(data[0:32]).Uint64()
+	valuesOffset := new(big.Int).SetBytes(data[32:64]).Uint64()
+
+	// Parse ids array
+	ids, err := mi.parseDynamicUint256Array(data, idsOffset)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse ids array: %w", err)
+	}
+
+	// Parse values array
+	values, err := mi.parseDynamicUint256Array(data, valuesOffset)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse values array: %w", err)
+	}
+
+	if len(ids) != len(values) {
+		return nil, nil, fmt.Errorf("ids and values arrays have different lengths: %d vs %d", len(ids), len(values))
+	}
+
+	return ids, values, nil
+}
+
+// parseDynamicUint256Array parses a dynamic uint256[] from data at given offset
+func (mi *MintIndexer) parseDynamicUint256Array(data []byte, offset uint64) ([]string, error) {
+	if offset+32 > uint64(len(data)) {
+		return nil, fmt.Errorf("offset out of bounds")
+	}
+
+	// Read array length
+	length := new(big.Int).SetBytes(data[offset : offset+32]).Uint64()
+
+	// Read array elements
+	result := make([]string, length)
+	for i := uint64(0); i < length; i++ {
+		elemOffset := offset + 32 + (i * 32)
+		if elemOffset+32 > uint64(len(data)) {
+			return nil, fmt.Errorf("element offset out of bounds")
+		}
+		value := new(big.Int).SetBytes(data[elemOffset : elemOffset+32])
+		result[i] = value.String()
+	}
+
+	return result, nil
 }
 
 // MintEvent represents a normalized mint event for publishing

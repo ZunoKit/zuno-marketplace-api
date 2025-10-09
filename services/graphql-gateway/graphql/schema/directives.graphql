@@ -1,0 +1,94 @@
+# Authentication and authorization directives
+
+directive @auth(
+  """
+  Requires authentication
+  """
+  required: Boolean = true
+  
+  """
+  Required role for access
+  """
+  role: String
+) on FIELD_DEFINITION
+
+directive @hasRole(
+  """
+  Required role(s) - user must have at least one
+  """
+  roles: [String!]!
+) on FIELD_DEFINITION
+
+directive @hasWallet(
+  """
+  Requires the user to have a connected wallet
+  """
+  required: Boolean = true
+) on FIELD_DEFINITION
+
+directive @rateLimit(
+  """
+  Maximum number of requests
+  """
+  limit: Int!
+  
+  """
+  Time window in seconds
+  """
+  window: Int!
+) on FIELD_DEFINITION
+
+directive @deprecated(
+  """
+  Reason for deprecation
+  """
+  reason: String = "No longer supported"
+) on FIELD_DEFINITION | ENUM_VALUE
+
+directive @complexity(
+  """
+  Complexity cost for this field
+  """
+  value: Int!
+  
+  """
+  Multipliers based on arguments
+  """
+  multipliers: [String!]
+) on FIELD_DEFINITION
+
+# Example usage in schema:
+extend type Query {
+  # Public endpoint - no auth required
+  publicData: String
+  
+  # Requires authentication
+  me: User @auth
+  
+  # Requires specific role
+  adminDashboard: AdminData @auth(role: "admin")
+  
+  # Rate limited endpoint
+  searchNFTs(query: String!): [NFT!]! 
+    @auth 
+    @rateLimit(limit: 10, window: 60)
+    @complexity(value: 20, multipliers: ["first", "last"])
+  
+  # Requires wallet connection
+  myNFTs: [NFT!]! @auth @hasWallet
+}
+
+extend type Mutation {
+  # Admin only mutation
+  deleteUser(id: ID!): Boolean! @auth(role: "admin")
+  
+  # Rate limited mutation
+  createCollection(input: CreateCollectionInput!): Collection! 
+    @auth 
+    @hasWallet
+    @rateLimit(limit: 5, window: 3600)
+  
+  # Deprecated mutation
+  oldCreateNFT(input: OldNFTInput!): NFT 
+    @deprecated(reason: "Use createNFTv2 instead")
+}
