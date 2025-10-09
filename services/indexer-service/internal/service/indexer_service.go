@@ -22,6 +22,7 @@ const (
 type IndexerService struct {
 	eventRepo         domain.EventRepository
 	checkpointRepo    domain.CheckpointRepository
+	repo              domain.CheckpointRepository // Alias for checkpointRepo for reorg handler
 	publisher         domain.EventPublisher
 	blockchainClients map[string]*blockchain.Client
 	factoryContracts  map[string]string // chainID -> factory contract address
@@ -47,6 +48,7 @@ func NewIndexerService(
 	return &IndexerService{
 		eventRepo:         eventRepo,
 		checkpointRepo:    checkpointRepo,
+		repo:              checkpointRepo, // Alias for reorg handler compatibility
 		publisher:         publisher,
 		blockchainClients: blockchainClients,
 		factoryContracts:  factoryContracts,
@@ -241,10 +243,11 @@ func (s *IndexerService) processChainEvents(ctx context.Context, chainID, factor
 			return fmt.Errorf("failed to get block info for %s: %w", toBlock.String(), err)
 		}
 
-		newCheckpoint := &domain.Checkpoint{
+		blockHash := blockInfo.Hash
+		newCheckpoint := &domain.IndexerCheckpoint{
 			ChainID:       chainID,
 			LastBlock:     toBlock,
-			LastBlockHash: blockInfo.Hash,
+			LastBlockHash: &blockHash,
 			UpdatedAt:     time.Now(),
 		}
 
@@ -406,4 +409,25 @@ func (s *IndexerService) GetIndexingStatus(ctx context.Context) (map[string]inte
 	}
 
 	return status, nil
+}
+
+// GetBlockByNumber retrieves block information by block number
+func (s *IndexerService) GetBlockByNumber(ctx context.Context, chainID string, blockNumber *big.Int) (*domain.Block, error) {
+	client, exists := s.blockchainClients[chainID]
+	if !exists {
+		return nil, fmt.Errorf("blockchain client not found for chain %s", chainID)
+	}
+
+	blockInfo, err := client.GetBlockByNumber(ctx, blockNumber)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get block %s: %w", blockNumber.String(), err)
+	}
+
+	// Convert BlockInfo to Block
+	return &domain.Block{
+		Number:     blockInfo.Number,
+		Hash:       blockInfo.Hash,
+		ParentHash: blockInfo.ParentHash,
+		Timestamp:  blockInfo.Timestamp,
+	}, nil
 }

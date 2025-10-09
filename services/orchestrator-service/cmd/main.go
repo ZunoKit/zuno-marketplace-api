@@ -15,6 +15,7 @@ import (
 	"github.com/quangdang46/NFT-Marketplace/shared/postgres"
 	protoChainRegistry "github.com/quangdang46/NFT-Marketplace/shared/proto/chainregistry"
 	orchestratorpb "github.com/quangdang46/NFT-Marketplace/shared/proto/orchestrator"
+	"github.com/quangdang46/NFT-Marketplace/shared/recovery"
 	"github.com/quangdang46/NFT-Marketplace/shared/redis"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -68,7 +69,22 @@ func main() {
 	if err != nil {
 		log.Fatalf("listen: %v", err)
 	}
-	s := grpc.NewServer()
+
+	// Create panic handler
+	panicHandler := recovery.NewPanicHandler(
+		recovery.WithStackLogging(true),
+		recovery.WithPanicCallback(func(recovered interface{}, stack []byte) {
+			log.Printf("PANIC recovered in orchestrator-service: %v\n%s", recovered, stack)
+		}),
+	)
+
+	// Create gRPC server with panic recovery
+	s := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			panicHandler.UnaryServerInterceptor(),
+		),
+		grpc.StreamInterceptor(panicHandler.StreamServerInterceptor()),
+	)
 	handler := grpcHandler.NewGRPCHandler(svc)
 	orchestratorpb.RegisterOrchestratorServiceServer(s, handler)
 	log.Printf("orchestrator-service gRPC on %s", cfg.GRPCPort)

@@ -6,6 +6,7 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/vektah/gqlparser/v2/ast"
+	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
 // DepthLimiter is a middleware that limits the depth of GraphQL queries
@@ -34,8 +35,10 @@ func (d *DepthLimiter) InterceptOperation(ctx context.Context, next graphql.Oper
 	if depth > d.MaxDepth {
 		return func(ctx context.Context) *graphql.Response {
 			return &graphql.Response{
-				Errors: []error{
-					fmt.Errorf("query depth %d exceeds maximum allowed depth of %d", depth, d.MaxDepth),
+				Errors: gqlerror.List{
+					&gqlerror.Error{
+						Message: fmt.Sprintf("query depth %d exceeds maximum allowed depth of %d", depth, d.MaxDepth),
+					},
 				},
 			}
 		}
@@ -165,8 +168,8 @@ func (c *QueryComplexityCalculator) Calculate(field *ast.Field, childComplexity 
 	for _, arg := range field.Arguments {
 		switch arg.Name {
 		case "first", "last", "limit":
-			if value, ok := arg.Value.(*ast.IntValue); ok {
-				if intVal, err := value.Value(nil); err == nil {
+			if arg.Value != nil && arg.Value.Kind == ast.IntValue {
+				if intVal, err := arg.Value.Value(nil); err == nil {
 					if limit, ok := intVal.(int64); ok && limit > 0 {
 						cost = cost * int(limit) * c.ListMultiplier / 10
 					}

@@ -32,6 +32,42 @@ type Checkpoint struct {
 	UpdatedAt     time.Time `db:"updated_at" json:"updated_at"`
 }
 
+// IndexerCheckpoint represents extended checkpoint with reorg tracking
+type IndexerCheckpoint struct {
+	ChainID            string     `db:"chain_id" json:"chain_id"`
+	LastBlock          *big.Int   `db:"last_block" json:"last_block"`
+	LastBlockHash      *string    `db:"last_block_hash" json:"last_block_hash"`
+	PreviousBlockHash  *string    `db:"previous_block_hash" json:"previous_block_hash"`
+	SafeBlock          *big.Int   `db:"safe_block" json:"safe_block"`
+	SafeBlockHash      *string    `db:"safe_block_hash" json:"safe_block_hash"`
+	ReorgDetectedCount int        `db:"reorg_detected_count" json:"reorg_detected_count"`
+	LastReorgAt        *time.Time `db:"last_reorg_at" json:"last_reorg_at"`
+	UpdatedAt          time.Time  `db:"updated_at" json:"updated_at"`
+}
+
+// Block represents blockchain block information
+type Block struct {
+	Number     *big.Int  `json:"number"`
+	Hash       string    `json:"hash"`
+	ParentHash string    `json:"parent_hash"`
+	Timestamp  time.Time `json:"timestamp"`
+}
+
+// ReorgHistory records chain reorganization events
+type ReorgHistory struct {
+	ID             string    `db:"id" json:"id"`
+	ChainID        string    `db:"chain_id" json:"chain_id"`
+	DetectedAt     time.Time `db:"detected_at" json:"detected_at"`
+	ForkBlock      uint64    `db:"fork_block" json:"fork_block"`
+	OldChainHead   uint64    `db:"old_chain_head" json:"old_chain_head"`
+	NewChainHead   uint64    `db:"new_chain_head" json:"new_chain_head"`
+	OldBlockHash   string    `db:"old_block_hash" json:"old_block_hash"`
+	NewBlockHash   string    `db:"new_block_hash" json:"new_block_hash"`
+	AffectedBlocks int       `db:"affected_blocks" json:"affected_blocks"`
+	RollbackTo     uint64    `db:"rollback_to" json:"rollback_to"`
+	DataAffected   string    `db:"data_affected" json:"data_affected"` // JSON string of affected data
+}
+
 // CollectionCreatedEvent represents the parsed CollectionCreated event
 type CollectionCreatedEvent struct {
 	CollectionAddress string   `json:"collection_address"`
@@ -72,13 +108,37 @@ type EventRepository interface {
 
 type CheckpointRepository interface {
 	// GetCheckpoint retrieves the latest checkpoint for a chain
-	GetCheckpoint(ctx context.Context, chainID string) (*Checkpoint, error)
+	GetCheckpoint(ctx context.Context, chainID string) (*IndexerCheckpoint, error)
 
 	// UpdateCheckpoint updates the checkpoint for a chain
-	UpdateCheckpoint(ctx context.Context, checkpoint *Checkpoint) error
+	UpdateCheckpoint(ctx context.Context, checkpoint *IndexerCheckpoint) error
 
 	// CreateCheckpoint creates a new checkpoint for a chain
-	CreateCheckpoint(ctx context.Context, checkpoint *Checkpoint) error
+	CreateCheckpoint(ctx context.Context, checkpoint *IndexerCheckpoint) error
+
+	// SaveReorgHistory saves a chain reorganization event
+	SaveReorgHistory(ctx context.Context, reorg *ReorgHistory) error
+
+	// BlockExistsWithHash checks if a block exists with a specific hash
+	BlockExistsWithHash(ctx context.Context, chainID string, blockNumber *big.Int, blockHash string) (bool, error)
+
+	// GetMintsInBlockRange gets mints within a block range
+	GetMintsInBlockRange(ctx context.Context, chainID string, fromBlock, toBlock *big.Int) ([]string, error)
+
+	// GetCollectionsInBlockRange gets collections created within a block range
+	GetCollectionsInBlockRange(ctx context.Context, chainID string, fromBlock, toBlock *big.Int) ([]string, error)
+
+	// CountTransactionsInBlockRange counts transactions within a block range
+	CountTransactionsInBlockRange(ctx context.Context, chainID string, fromBlock, toBlock *big.Int) (int, error)
+
+	// MarkNFTsAsReorged marks NFTs as affected by reorg
+	MarkNFTsAsReorged(ctx context.Context, chainID string, afterBlock *big.Int) error
+
+	// MarkCollectionsAsReorged marks collections as affected by reorg
+	MarkCollectionsAsReorged(ctx context.Context, chainID string, afterBlock *big.Int) error
+
+	// DeleteEventsAfterBlock deletes events after a specific block
+	DeleteEventsAfterBlock(ctx context.Context, chainID string, afterBlock *big.Int) error
 
 	// HealthCheck performs a health check on the repository
 	HealthCheck(ctx context.Context) error
@@ -117,9 +177,10 @@ type BlockchainClient interface {
 // Blockchain types
 
 type BlockInfo struct {
-	Number    *big.Int  `json:"number"`
-	Hash      string    `json:"hash"`
-	Timestamp time.Time `json:"timestamp"`
+	Number     *big.Int  `json:"number"`
+	Hash       string    `json:"hash"`
+	ParentHash string    `json:"parent_hash"`
+	Timestamp  time.Time `json:"timestamp"`
 }
 
 type LogFilter struct {

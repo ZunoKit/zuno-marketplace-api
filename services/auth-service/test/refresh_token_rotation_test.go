@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 
 	"github.com/quangdang46/NFT-Marketplace/services/auth-service/internal/domain"
 	"github.com/quangdang46/NFT-Marketplace/services/auth-service/internal/service"
@@ -121,7 +122,7 @@ func TestRefreshTokenRotation_Success(t *testing.T) {
 	sessionID := uuid.New().String()
 	userID := uuid.New().String()
 	tokenFamilyID := uuid.New().String()
-	oldRefreshToken := "old-refresh-token-64-chars-0123456789abcdef0123456789abcdef01234567"
+	oldRefreshToken := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	oldRefreshHash := service.HashRefreshToken(oldRefreshToken)
 
 	session := &domain.Session{
@@ -176,7 +177,7 @@ func TestRefreshTokenRotation_ReplayAttackDetection(t *testing.T) {
 	sessionID := uuid.New().String()
 	userID := uuid.New().String()
 	tokenFamilyID := uuid.New().String()
-	reusedToken := "reused-refresh-token-64-chars-0123456789abcdef0123456789abcdef0123"
+	reusedToken := "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
 	reusedHash := service.HashRefreshToken(reusedToken)
 
 	session := &domain.Session{
@@ -229,7 +230,7 @@ func TestRefreshTokenRotation_ExpiredSession(t *testing.T) {
 	sessionID := uuid.New().String()
 	userID := uuid.New().String()
 	tokenFamilyID := uuid.New().String()
-	refreshToken := "refresh-token-64-chars-0123456789abcdef0123456789abcdef01234567"
+	refreshToken := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	refreshHash := service.HashRefreshToken(refreshToken)
 
 	session := &domain.Session{
@@ -280,7 +281,7 @@ func TestRefreshTokenRotation_RevokedSession(t *testing.T) {
 	sessionID := uuid.New().String()
 	userID := uuid.New().String()
 	tokenFamilyID := uuid.New().String()
-	refreshToken := "refresh-token-64-chars-0123456789abcdef0123456789abcdef01234567"
+	refreshToken := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	refreshHash := service.HashRefreshToken(refreshToken)
 	revokedAt := time.Now().Add(-1 * time.Hour)
 
@@ -315,22 +316,22 @@ type MockUserService struct {
 	mock.Mock
 }
 
-func (m *MockUserService) CreateUser(ctx context.Context, in *protoUser.CreateUserRequest) (*protoUser.CreateUserResponse, error) {
+func (m *MockUserService) EnsureUser(ctx context.Context, in *protoUser.EnsureUserRequest, opts ...grpc.CallOption) (*protoUser.EnsureUserResponse, error) {
 	args := m.Called(ctx, in)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*protoUser.CreateUserResponse), args.Error(1)
+	return args.Get(0).(*protoUser.EnsureUserResponse), args.Error(1)
 }
 
 type MockWalletService struct {
 	mock.Mock
 }
 
-func (m *MockWalletService) LinkWallet(ctx context.Context, in *protoWallet.LinkWalletRequest) (*protoWallet.LinkWalletResponse, error) {
+func (m *MockWalletService) UpsertLink(ctx context.Context, in *protoWallet.UpsertLinkRequest, opts ...grpc.CallOption) (*protoWallet.UpsertLinkResponse, error) {
 	args := m.Called(ctx, in)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*protoWallet.LinkWalletResponse), args.Error(1)
+	return args.Get(0).(*protoWallet.UpsertLinkResponse), args.Error(1)
 }

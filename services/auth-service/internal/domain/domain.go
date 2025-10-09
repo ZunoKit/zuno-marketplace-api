@@ -2,12 +2,7 @@ package domain
 
 import (
 	"context"
-	"errors"
 	"time"
-)
-
-var (
-	ErrNonceNotFound = errors.New("nonce not found")
 )
 
 type UserID = string

@@ -48,7 +48,7 @@ func (s *CatalogService) HandleCollectionCreated(ctx context.Context, evt *domai
 	// Use unit of work to ensure data consistency - ALL operations in one transaction
 	err = s.unitOfWork.WithinTx(ctx, func(ctx context.Context, tx domain.Tx) error {
 		// Check if event has already been processed (INSIDE transaction)
-		processed, err := tx.ProcessedEventsRepo().MarkProcessed(ctx, evt.EventID)
+		processed, err := tx.ProcessedRepo().MarkProcessed(ctx, evt.EventID)
 		if err != nil {
 			return fmt.Errorf("failed to check if event is processed: %w", err)
 		}

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 )
 
@@ -185,9 +184,9 @@ func (pm *PoolMonitor) logStats() {
 	}
 
 	// Log if many idle connections
-	if stats.Idle > stats.MaxIdleConnections/2 {
-		fmt.Printf("[POOL INFO] Service=%s Many idle connections: %d/%d\n",
-			pm.service, stats.Idle, stats.MaxIdleConnections)
+	if stats.Idle > 10 { // Using a reasonable threshold instead of MaxIdleConnections
+		fmt.Printf("[POOL INFO] Service=%s Many idle connections: %d\n",
+			pm.service, stats.Idle)
 	}
 }
 

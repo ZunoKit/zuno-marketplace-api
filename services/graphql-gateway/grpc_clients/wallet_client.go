@@ -1,31 +1,44 @@
 package grpcclients
 
 import (
-	"log"
+	"fmt"
 
+	"github.com/quangdang46/NFT-Marketplace/shared/logging"
 	"github.com/quangdang46/NFT-Marketplace/shared/proto/wallet"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"github.com/quangdang46/NFT-Marketplace/shared/resilience"
 )
 
 type WalletClient struct {
-	Client *wallet.WalletServiceClient
-	conn   *grpc.ClientConn
+	Client          *wallet.WalletServiceClient
+	resilientClient *ResilientClient
 }
 
 func NewWalletClient(url string) *WalletClient {
-	dialOptions := []grpc.DialOption{
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	}
-	conn, err := grpc.Dial(url, dialOptions...)
+	logger := logging.NewLogger(logging.DefaultConfig("graphql-gateway"))
+
+	resilientClient, err := NewResilientClient("wallet-service", url, logger)
 	if err != nil {
-		log.Fatalf("failed to dial auth service: %v", err)
+		logger.WithFields(map[string]interface{}{
+			"error": err.Error(),
+			"url":   url,
+		}).Fatal("Failed to create wallet client")
+		panic(fmt.Sprintf("failed to create wallet client: %v", err))
 	}
 
-	client := wallet.NewWalletServiceClient(conn)
+	client := wallet.NewWalletServiceClient(resilientClient.GetConnection())
 
 	return &WalletClient{
-		Client: &client,
-		conn:   conn,
+		Client:          &client,
+		resilientClient: resilientClient,
 	}
+}
+
+// GetStats returns circuit breaker statistics for the wallet service
+func (c *WalletClient) GetStats() resilience.CircuitBreakerStats {
+	return c.resilientClient.GetStats()
+}
+
+// Close closes the underlying connection
+func (c *WalletClient) Close() error {
+	return c.resilientClient.Close()
 }

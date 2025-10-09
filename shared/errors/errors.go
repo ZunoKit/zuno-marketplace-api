@@ -201,14 +201,18 @@ func Duplicate(resource string, field string, value interface{}) *Error {
 
 // ToGRPCError converts to a gRPC status error
 func (e *Error) ToGRPCError() error {
-	st := status.New(e.GRPCCode, e.Message)
-
-	// Add details if available
+	// If there are details, append them to the message
+	message := e.Message
 	if len(e.Details) > 0 {
-		// In production, you'd use proto messages for details
 		detailsStr := fmt.Sprintf("%v", e.Details)
-		st, _ = st.WithDetails(&detailsStr)
+		message = fmt.Sprintf("%s [details: %s]", e.Message, detailsStr)
 	}
+
+	st := status.New(e.GRPCCode, message)
+
+	// Note: For proper structured details, you would need to define proto messages
+	// and use st.WithDetails() with proper proto message types.
+	// For now, we include details in the message string.
 
 	return st.Err()
 }

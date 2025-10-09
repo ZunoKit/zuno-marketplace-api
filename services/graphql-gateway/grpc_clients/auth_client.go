@@ -1,31 +1,44 @@
 package grpcclients
 
 import (
-	"log"
+	"fmt"
 
+	"github.com/quangdang46/NFT-Marketplace/shared/logging"
 	"github.com/quangdang46/NFT-Marketplace/shared/proto/auth"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"github.com/quangdang46/NFT-Marketplace/shared/resilience"
 )
 
 type AuthClient struct {
-	Client *auth.AuthServiceClient
-	conn   *grpc.ClientConn
+	Client          *auth.AuthServiceClient
+	resilientClient *ResilientClient
 }
 
 func NewAuthClient(url string) *AuthClient {
-	dialOptions := []grpc.DialOption{
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	}
-	conn, err := grpc.Dial(url, dialOptions...)
+	logger := logging.NewLogger(logging.DefaultConfig("graphql-gateway"))
+
+	resilientClient, err := NewResilientClient("auth-service", url, logger)
 	if err != nil {
-		log.Fatalf("failed to dial auth service: %v", err)
+		logger.WithFields(map[string]interface{}{
+			"error": err.Error(),
+			"url":   url,
+		}).Fatal("Failed to create auth client")
+		panic(fmt.Sprintf("failed to create auth client: %v", err))
 	}
 
-	client := auth.NewAuthServiceClient(conn)
+	client := auth.NewAuthServiceClient(resilientClient.GetConnection())
 
 	return &AuthClient{
-		Client: &client,
-		conn:   conn,
+		Client:          &client,
+		resilientClient: resilientClient,
 	}
+}
+
+// GetStats returns circuit breaker statistics for the auth service
+func (c *AuthClient) GetStats() resilience.CircuitBreakerStats {
+	return c.resilientClient.GetStats()
+}
+
+// Close closes the underlying connection
+func (c *AuthClient) Close() error {
+	return c.resilientClient.Close()
 }

@@ -1,24 +1,44 @@
 package grpcclients
 
 import (
-	"log"
+	"fmt"
 
+	"github.com/quangdang46/NFT-Marketplace/shared/logging"
 	chainregpb "github.com/quangdang46/NFT-Marketplace/shared/proto/chainregistry"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"github.com/quangdang46/NFT-Marketplace/shared/resilience"
 )
 
 type ChainRegistryClient struct {
-	Client *chainregpb.ChainRegistryServiceClient
-	conn   *grpc.ClientConn
+	Client          *chainregpb.ChainRegistryServiceClient
+	resilientClient *ResilientClient
 }
 
 func NewChainRegistryClient(url string) *ChainRegistryClient {
-	dialOptions := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-	conn, err := grpc.Dial(url, dialOptions...)
+	logger := logging.NewLogger(logging.DefaultConfig("graphql-gateway"))
+
+	resilientClient, err := NewResilientClient("chain-registry-service", url, logger)
 	if err != nil {
-		log.Fatalf("failed to dial chain-registry service: %v", err)
+		logger.WithFields(map[string]interface{}{
+			"error": err.Error(),
+			"url":   url,
+		}).Fatal("Failed to create chain registry client")
+		panic(fmt.Sprintf("failed to create chain registry client: %v", err))
 	}
-	client := chainregpb.NewChainRegistryServiceClient(conn)
-	return &ChainRegistryClient{Client: &client, conn: conn}
+
+	client := chainregpb.NewChainRegistryServiceClient(resilientClient.GetConnection())
+
+	return &ChainRegistryClient{
+		Client:          &client,
+		resilientClient: resilientClient,
+	}
+}
+
+// GetStats returns circuit breaker statistics for the chain registry service
+func (c *ChainRegistryClient) GetStats() resilience.CircuitBreakerStats {
+	return c.resilientClient.GetStats()
+}
+
+// Close closes the underlying connection
+func (c *ChainRegistryClient) Close() error {
+	return c.resilientClient.Close()
 }

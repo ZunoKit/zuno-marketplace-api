@@ -10,6 +10,7 @@ import (
 	"github.com/quangdang46/NFT-Marketplace/services/chain-registry-service/internal/seed"
 	"github.com/quangdang46/NFT-Marketplace/services/chain-registry-service/internal/service"
 	chainpb "github.com/quangdang46/NFT-Marketplace/shared/proto/chainregistry"
+	"github.com/quangdang46/NFT-Marketplace/shared/recovery"
 	"google.golang.org/grpc"
 
 	"github.com/quangdang46/NFT-Marketplace/services/chain-registry-service/internal/config"
@@ -49,7 +50,21 @@ func main() {
 	repo := repository.NewRepository(pg, redis)
 	svc := service.New(repo)
 
-	server := grpc.NewServer()
+	// Create panic handler
+	panicHandler := recovery.NewPanicHandler(
+		recovery.WithStackLogging(true),
+		recovery.WithPanicCallback(func(recovered interface{}, stack []byte) {
+			log.Printf("PANIC recovered in chain-registry-service: %v\n%s", recovered, stack)
+		}),
+	)
+
+	// Create gRPC server with panic recovery
+	server := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			panicHandler.UnaryServerInterceptor(),
+		),
+		grpc.StreamInterceptor(panicHandler.StreamServerInterceptor()),
+	)
 	handler := grpc_handler.NewGRPCHandler(svc)
 	chainpb.RegisterChainRegistryServiceServer(server, handler)
 

@@ -23,6 +23,7 @@ import (
 	authProto "github.com/quangdang46/NFT-Marketplace/shared/proto/auth"
 	protoUser "github.com/quangdang46/NFT-Marketplace/shared/proto/user"
 	protoWallet "github.com/quangdang46/NFT-Marketplace/shared/proto/wallet"
+	"github.com/quangdang46/NFT-Marketplace/shared/recovery"
 	"github.com/quangdang46/NFT-Marketplace/shared/redis"
 )
 
@@ -126,6 +127,14 @@ func main() {
 	// Create rate limiter
 	methodRateLimiter := middleware.NewMethodRateLimiter(middleware.AuthServiceRateLimitConfig())
 
+	// Create panic handler
+	panicHandler := recovery.NewPanicHandler(
+		recovery.WithStackLogging(true),
+		recovery.WithPanicCallback(func(recovered interface{}, stack []byte) {
+			log.Printf("PANIC recovered in auth-service: %v\n%s", recovered, stack)
+		}),
+	)
+
 	// Configure TLS for server
 	var serverOptions []grpc.ServerOption
 	if cfg.TLSEnabled {
@@ -133,18 +142,30 @@ func main() {
 		if err != nil {
 			log.Printf("Warning: Failed to load server TLS credentials, running without TLS: %v", err)
 			serverOptions = []grpc.ServerOption{
-				grpc.UnaryInterceptor(methodRateLimiter.UnaryInterceptor()),
+				grpc.ChainUnaryInterceptor(
+					panicHandler.UnaryServerInterceptor(),
+					methodRateLimiter.UnaryInterceptor(),
+				),
+				grpc.StreamInterceptor(panicHandler.StreamServerInterceptor()),
 			}
 		} else {
 			serverOptions = []grpc.ServerOption{
 				grpc.Creds(serverCreds),
-				grpc.UnaryInterceptor(methodRateLimiter.UnaryInterceptor()),
+				grpc.ChainUnaryInterceptor(
+					panicHandler.UnaryServerInterceptor(),
+					methodRateLimiter.UnaryInterceptor(),
+				),
+				grpc.StreamInterceptor(panicHandler.StreamServerInterceptor()),
 			}
 			log.Println("TLS enabled for gRPC server")
 		}
 	} else {
 		serverOptions = []grpc.ServerOption{
-			grpc.UnaryInterceptor(methodRateLimiter.UnaryInterceptor()),
+			grpc.ChainUnaryInterceptor(
+				panicHandler.UnaryServerInterceptor(),
+				methodRateLimiter.UnaryInterceptor(),
+			),
+			grpc.StreamInterceptor(panicHandler.StreamServerInterceptor()),
 		}
 	}
 

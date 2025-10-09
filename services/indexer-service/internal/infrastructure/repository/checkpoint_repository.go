@@ -54,30 +54,31 @@ func (r *CheckpointRepository) initSchema() error {
 }
 
 // GetCheckpoint retrieves the latest checkpoint for a chain
-func (r *CheckpointRepository) GetCheckpoint(ctx context.Context, chainID string) (*domain.Checkpoint, error) {
+func (r *CheckpointRepository) GetCheckpoint(ctx context.Context, chainID string) (*domain.IndexerCheckpoint, error) {
 	query := `
 		SELECT chain_id, last_block, last_block_hash, updated_at
 		FROM indexer_checkpoints
 		WHERE chain_id = $1
 	`
 
-	var checkpoint domain.Checkpoint
+	var checkpoint domain.IndexerCheckpoint
 	var lastBlockStr string
+	var lastBlockHash sql.NullString
 
 	err := r.db.GetClient().QueryRowContext(ctx, query, chainID).Scan(
 		&checkpoint.ChainID,
 		&lastBlockStr,
-		&checkpoint.LastBlockHash,
+		&lastBlockHash,
 		&checkpoint.UpdatedAt,
 	)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
 			// Return default checkpoint starting from block 0
-			return &domain.Checkpoint{
+			return &domain.IndexerCheckpoint{
 				ChainID:       chainID,
 				LastBlock:     big.NewInt(0),
-				LastBlockHash: "",
+				LastBlockHash: nil,
 				UpdatedAt:     time.Now(),
 			}, nil
 		}
@@ -93,11 +94,15 @@ func (r *CheckpointRepository) GetCheckpoint(ctx context.Context, chainID string
 	}
 	checkpoint.LastBlock = lastBlock
 
+	if lastBlockHash.Valid && lastBlockHash.String != "" {
+		checkpoint.LastBlockHash = &lastBlockHash.String
+	}
+
 	return &checkpoint, nil
 }
 
 // UpdateCheckpoint updates the checkpoint for a chain
-func (r *CheckpointRepository) UpdateCheckpoint(ctx context.Context, checkpoint *domain.Checkpoint) error {
+func (r *CheckpointRepository) UpdateCheckpoint(ctx context.Context, checkpoint *domain.IndexerCheckpoint) error {
 	if checkpoint == nil {
 		return fmt.Errorf("checkpoint cannot be nil")
 	}
@@ -113,10 +118,15 @@ func (r *CheckpointRepository) UpdateCheckpoint(ctx context.Context, checkpoint 
 	lastBlockStr := checkpoint.LastBlock.String()
 	updatedAt := time.Now()
 
+	var lastBlockHash string
+	if checkpoint.LastBlockHash != nil {
+		lastBlockHash = *checkpoint.LastBlockHash
+	}
+
 	result, err := r.db.GetClient().ExecContext(ctx, query,
 		checkpoint.ChainID,
 		lastBlockStr,
-		checkpoint.LastBlockHash,
+		lastBlockHash,
 		updatedAt,
 	)
 
@@ -140,7 +150,7 @@ func (r *CheckpointRepository) UpdateCheckpoint(ctx context.Context, checkpoint 
 }
 
 // CreateCheckpoint creates a new checkpoint for a chain
-func (r *CheckpointRepository) CreateCheckpoint(ctx context.Context, checkpoint *domain.Checkpoint) error {
+func (r *CheckpointRepository) CreateCheckpoint(ctx context.Context, checkpoint *domain.IndexerCheckpoint) error {
 	if checkpoint == nil {
 		return fmt.Errorf("checkpoint cannot be nil")
 	}
@@ -157,10 +167,15 @@ func (r *CheckpointRepository) CreateCheckpoint(ctx context.Context, checkpoint 
 	lastBlockStr := checkpoint.LastBlock.String()
 	updatedAt := time.Now()
 
+	var lastBlockHash string
+	if checkpoint.LastBlockHash != nil {
+		lastBlockHash = *checkpoint.LastBlockHash
+	}
+
 	_, err := r.db.GetClient().ExecContext(ctx, query,
 		checkpoint.ChainID,
 		lastBlockStr,
-		checkpoint.LastBlockHash,
+		lastBlockHash,
 		updatedAt,
 	)
 
@@ -243,10 +258,10 @@ func (r *CheckpointRepository) IncrementCheckpoint(ctx context.Context, chainID,
 	newBlock := new(big.Int).Add(checkpoint.LastBlock, big.NewInt(1))
 
 	// Update checkpoint
-	updatedCheckpoint := &domain.Checkpoint{
+	updatedCheckpoint := &domain.IndexerCheckpoint{
 		ChainID:       chainID,
 		LastBlock:     newBlock,
-		LastBlockHash: blockHash,
+		LastBlockHash: &blockHash,
 		UpdatedAt:     time.Now(),
 	}
 
@@ -265,10 +280,14 @@ func (r *CheckpointRepository) IncrementCheckpoint(ctx context.Context, chainID,
 
 // SetCheckpointToBlock sets the checkpoint to a specific block
 func (r *CheckpointRepository) SetCheckpointToBlock(ctx context.Context, chainID string, blockNumber *big.Int, blockHash string) error {
-	checkpoint := &domain.Checkpoint{
+	var lastBlockHashPtr *string
+	if blockHash != "" {
+		lastBlockHashPtr = &blockHash
+	}
+	checkpoint := &domain.IndexerCheckpoint{
 		ChainID:       chainID,
 		LastBlock:     blockNumber,
-		LastBlockHash: blockHash,
+		LastBlockHash: lastBlockHashPtr,
 		UpdatedAt:     time.Now(),
 	}
 
@@ -313,4 +332,94 @@ func (r *CheckpointRepository) GetLastProcessedBlock(ctx context.Context, chainI
 		return nil, err
 	}
 	return checkpoint.LastBlock, nil
+}
+
+// SaveReorgHistory saves a chain reorganization event
+func (r *CheckpointRepository) SaveReorgHistory(ctx context.Context, reorg *domain.ReorgHistory) error {
+	// Create reorg_history table if it doesn't exist
+	createTableQuery := `
+		CREATE TABLE IF NOT EXISTS reorg_history (
+			id SERIAL PRIMARY KEY,
+			chain_id VARCHAR(50) NOT NULL,
+			detected_at TIMESTAMP WITH TIME ZONE NOT NULL,
+			fork_block BIGINT NOT NULL,
+			old_chain_head BIGINT NOT NULL,
+			new_chain_head BIGINT NOT NULL,
+			old_block_hash VARCHAR(66) NOT NULL,
+			new_block_hash VARCHAR(66) NOT NULL,
+			affected_blocks INT NOT NULL,
+			rollback_to BIGINT NOT NULL,
+			data_affected TEXT
+		);
+		CREATE INDEX IF NOT EXISTS idx_reorg_history_chain ON reorg_history(chain_id, detected_at DESC);
+	`
+	_, _ = r.db.GetClient().ExecContext(ctx, createTableQuery)
+
+	query := `
+		INSERT INTO reorg_history (
+			chain_id, detected_at, fork_block, old_chain_head, new_chain_head,
+			old_block_hash, new_block_hash, affected_blocks, rollback_to, data_affected
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`
+
+	_, err := r.db.GetClient().ExecContext(ctx, query,
+		reorg.ChainID, reorg.DetectedAt, reorg.ForkBlock, reorg.OldChainHead,
+		reorg.NewChainHead, reorg.OldBlockHash, reorg.NewBlockHash,
+		reorg.AffectedBlocks, reorg.RollbackTo, reorg.DataAffected,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to save reorg history: %w", err)
+	}
+	return nil
+}
+
+// BlockExistsWithHash checks if a block exists with a specific hash
+func (r *CheckpointRepository) BlockExistsWithHash(ctx context.Context, chainID string, blockNumber *big.Int, blockHash string) (bool, error) {
+	// This would typically check a blocks table, but since we don't have one,
+	// we'll return false for now (assuming blocks aren't stored separately)
+	// In a production system, you'd have a blocks table to check
+	return false, nil
+}
+
+// GetMintsInBlockRange gets mints within a block range
+func (r *CheckpointRepository) GetMintsInBlockRange(ctx context.Context, chainID string, fromBlock, toBlock *big.Int) ([]string, error) {
+	// This would query NFT mints from the catalog service database
+	// For now, return empty as this requires integration with catalog service
+	return []string{}, nil
+}
+
+// GetCollectionsInBlockRange gets collections created within a block range
+func (r *CheckpointRepository) GetCollectionsInBlockRange(ctx context.Context, chainID string, fromBlock, toBlock *big.Int) ([]string, error) {
+	// This would query collections from the catalog service database
+	// For now, return empty as this requires integration with catalog service
+	return []string{}, nil
+}
+
+// CountTransactionsInBlockRange counts transactions within a block range
+func (r *CheckpointRepository) CountTransactionsInBlockRange(ctx context.Context, chainID string, fromBlock, toBlock *big.Int) (int, error) {
+	// This would count transactions in the specified range
+	// For now, return 0 as this requires a transactions table
+	return 0, nil
+}
+
+// MarkNFTsAsReorged marks NFTs as affected by reorg
+func (r *CheckpointRepository) MarkNFTsAsReorged(ctx context.Context, chainID string, afterBlock *big.Int) error {
+	// This would update NFTs in the catalog service to mark them as reorged
+	// For now, just return nil as this requires catalog service integration
+	return nil
+}
+
+// MarkCollectionsAsReorged marks collections as affected by reorg
+func (r *CheckpointRepository) MarkCollectionsAsReorged(ctx context.Context, chainID string, afterBlock *big.Int) error {
+	// This would update collections in the catalog service to mark them as reorged
+	// For now, just return nil as this requires catalog service integration
+	return nil
+}
+
+// DeleteEventsAfterBlock deletes events after a specific block
+func (r *CheckpointRepository) DeleteEventsAfterBlock(ctx context.Context, chainID string, afterBlock *big.Int) error {
+	// This would delete events from MongoDB after the specified block
+	// For now, just return nil as this requires event repository integration
+	return nil
 }

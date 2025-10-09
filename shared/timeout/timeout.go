@@ -3,6 +3,7 @@ package timeout
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"google.golang.org/grpc"

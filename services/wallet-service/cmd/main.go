@@ -15,6 +15,7 @@ import (
 	"github.com/quangdang46/NFT-Marketplace/shared/messaging"
 	"github.com/quangdang46/NFT-Marketplace/shared/postgres"
 	protoWallet "github.com/quangdang46/NFT-Marketplace/shared/proto/wallet"
+	"github.com/quangdang46/NFT-Marketplace/shared/recovery"
 )
 
 func main() {
@@ -43,7 +44,21 @@ func main() {
 	eventPublisher := events.NewEventPublisher(amqpClient)
 	walletService := service.NewWalletService(walletRepo, eventPublisher)
 
-	server := grpc.NewServer()
+	// Create panic handler
+	panicHandler := recovery.NewPanicHandler(
+		recovery.WithStackLogging(true),
+		recovery.WithPanicCallback(func(recovered interface{}, stack []byte) {
+			log.Printf("PANIC recovered in wallet-service: %v\n%s", recovered, stack)
+		}),
+	)
+
+	// Create gRPC server with panic recovery
+	server := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			panicHandler.UnaryServerInterceptor(),
+		),
+		grpc.StreamInterceptor(panicHandler.StreamServerInterceptor()),
+	)
 	handler := grpc_handler.NewgRPCHandler(server, walletService)
 	protoWallet.RegisterWalletServiceServer(server, handler)
 
