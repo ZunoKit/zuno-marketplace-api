@@ -78,9 +78,10 @@ func (c *Client) GetBlockByNumber(ctx context.Context, blockNumber *big.Int) (*d
 	}
 
 	return &domain.BlockInfo{
-		Number:    block.Number(),
-		Hash:      block.Hash().Hex(),
-		Timestamp: time.Unix(int64(block.Time()), 0),
+		Number:     block.Number(),
+		Hash:       block.Hash().Hex(),
+		ParentHash: block.ParentHash().Hex(),
+		Timestamp:  time.Unix(int64(block.Time()), 0),
 	}, nil
 }
 

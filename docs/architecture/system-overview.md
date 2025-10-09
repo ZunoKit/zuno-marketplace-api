@@ -4,6 +4,8 @@
 
 - [Database Schema](./database-schema.md) - Detailed database schema documentation
 - [Database Diagrams](./database-diagram.md) - Visual database architecture with Mermaid diagrams
+- [Production Readiness](../production-readiness.md) - Production features and deployment guide
+- [API Documentation](../api/README.md) - Complete API reference and examples
 
 ## Microservices Architecture
 
@@ -119,3 +121,93 @@ subs.wallets.linked ← bind wallets.events với key wallet.linked
 
 Mỗi queue gắn DLX + TTL retry
 ```
+
+## Production Security Architecture
+
+### mTLS Communication
+```mermaid
+flowchart LR
+  subgraph "External Zone"
+    CLIENT[Web Client]
+  end
+  
+  subgraph "DMZ"
+    GW[GraphQL Gateway]
+  end
+  
+  subgraph "Internal Zone"
+    AUTH[Auth Service]
+    USER[User Service]
+    WALLET[Wallet Service]
+  end
+  
+  CLIENT --"HTTPS"--> GW
+  GW <--"mTLS/gRPC"--> AUTH
+  GW <--"mTLS/gRPC"--> USER
+  GW <--"mTLS/gRPC"--> WALLET
+```
+
+### Security Features
+- **Authentication**: SIWE with refresh token rotation
+- **Authorization**: Role-based access control with GraphQL directives
+- **Encryption**: mTLS for all internal communication
+- **Rate Limiting**: Token bucket algorithm at GraphQL layer
+- **Session Security**: Device fingerprinting and tracking
+- **Input Validation**: Schema validation and sanitization
+
+## Performance Architecture
+
+### Caching Strategy
+```mermaid
+flowchart TD
+  REQUEST[Client Request]
+  GATEWAY[GraphQL Gateway]
+  CACHE{Cache Hit?}
+  REDIS[(Redis Cache)]
+  SERVICE[Microservice]
+  DB[(Database)]
+  
+  REQUEST --> GATEWAY
+  GATEWAY --> CACHE
+  CACHE -->|Yes| REDIS
+  REDIS --> GATEWAY
+  CACHE -->|No| SERVICE
+  SERVICE --> DB
+  SERVICE --> REDIS
+```
+
+### Connection Pooling
+- **PostgreSQL**: Service-specific pool configurations
+- **Redis**: Cluster-aware connection pooling
+- **gRPC**: Connection reuse with keep-alive
+
+### Circuit Breakers
+- Automatic failure detection
+- Service isolation during outages
+- Gradual recovery with half-open state
+
+## Monitoring & Observability
+
+### Metrics Collection
+```mermaid
+flowchart LR
+  SERVICES[Services]
+  METRICS[Prometheus Metrics]
+  GRAFANA[Grafana]
+  ALERTS[Alert Manager]
+  
+  SERVICES --"expose /metrics"--> METRICS
+  METRICS --> GRAFANA
+  METRICS --> ALERTS
+```
+
+### Logging Pipeline
+- **Structured Logging**: JSON format with zerolog
+- **Log Aggregation**: Centralized log collection
+- **Correlation IDs**: Request tracing across services
+- **Audit Trail**: Security and compliance logging
+
+### Health Checks
+- `/health` - Liveness probe
+- `/ready` - Readiness probe
+- `/metrics` - Prometheus metrics endpoint

@@ -1,35 +1,44 @@
 package grpcclients
 
 import (
-	"log"
+	"fmt"
 
+	"github.com/quangdang46/NFT-Marketplace/shared/logging"
 	"github.com/quangdang46/NFT-Marketplace/shared/proto/media"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"github.com/quangdang46/NFT-Marketplace/shared/resilience"
 )
 
 type MediaClient struct {
-	Client *media.MediaServiceClient
-	conn   *grpc.ClientConn
+	Client          *media.MediaServiceClient
+	resilientClient *ResilientClient
 }
 
 func NewMediaClient(url string) *MediaClient {
-	dialOptions := []grpc.DialOption{
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	}
-	conn, err := grpc.Dial(url, dialOptions...)
+	logger := logging.NewLogger(logging.DefaultConfig("graphql-gateway"))
+
+	resilientClient, err := NewResilientClient("media-service", url, logger)
 	if err != nil {
-		log.Fatalf("failed to dial media service: %v", err)
+		logger.WithFields(map[string]interface{}{
+			"error": err.Error(),
+			"url":   url,
+		}).Fatal("Failed to create media client")
+		panic(fmt.Sprintf("failed to create media client: %v", err))
 	}
 
-	client := media.NewMediaServiceClient(conn)
+	client := media.NewMediaServiceClient(resilientClient.GetConnection())
 
 	return &MediaClient{
-		Client: &client,
-		conn:   conn,
+		Client:          &client,
+		resilientClient: resilientClient,
 	}
 }
 
+// GetStats returns circuit breaker statistics for the media service
+func (c *MediaClient) GetStats() resilience.CircuitBreakerStats {
+	return c.resilientClient.GetStats()
+}
+
+// Close closes the underlying connection
 func (c *MediaClient) Close() error {
-	return c.conn.Close()
+	return c.resilientClient.Close()
 }

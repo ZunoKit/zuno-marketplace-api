@@ -42,6 +42,10 @@ func (r *Repo) Create(ctx context.Context, it *domain.Intent) error {
 func (r *Repo) UpdateTxHash(ctx context.Context, intentID string, txHash string, contractAddr *domain.Address) error {
 	_, err := r.pg.GetClient().ExecContext(ctx, UpdateTxHashQuery, txHash, contractAddr, time.Now(), intentID)
 	if err != nil {
+		// Check if it's a unique constraint violation
+		if postgres.IsUniqueViolation(err, "unique_chain_tx") {
+			return domain.ErrDuplicateTx
+		}
 		return fmt.Errorf("update tx hash: %w", err)
 	}
 

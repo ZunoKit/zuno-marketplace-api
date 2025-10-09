@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/99designs/gqlgen/graphql/handler"
+	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/quangdang46/NFT-Marketplace/services/graphql-gateway/config"
 	graphql_resolver "github.com/quangdang46/NFT-Marketplace/services/graphql-gateway/graphql"
@@ -73,6 +74,15 @@ func main() {
 
 	// Create GraphQL handler with middleware chain
 	graphqlHandler := handler.NewDefaultServer(es)
+
+	// Add query complexity limiting to prevent DoS attacks
+	// Default complexity limit: 1000 points
+	graphqlHandler.Use(extension.FixedComplexityLimit(cfg.MaxQueryComplexity))
+
+	// Add query depth limiting to prevent deeply nested queries
+	// Default depth limit: 10 levels
+	graphqlHandler.Use(extension.Introspection{})
+	graphqlHandler.Use(&middleware.DepthLimiter{MaxDepth: cfg.MaxQueryDepth})
 
 	// Apply middleware chain: Auth -> Cookie -> GraphQL
 	middlewareChain := middleware.CreateAuthMiddleware()(

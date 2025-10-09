@@ -25,6 +25,8 @@ type Config struct {
 	RedisConfig      redis.RedisConfig
 	RabbitMQ         messaging.RabbitMQConfig
 	Features         Features
+	TLSEnabled       bool   // Whether to enable TLS for gRPC
+	CertDir          string // Directory containing certificates
 }
 
 // NewConfig creates and loads configuration from environment variables
@@ -43,6 +45,8 @@ func NewConfig() *Config {
 		RedisConfig:      loadRedisConfig(),
 		RabbitMQ:         loadRabbitMQConfig(),
 		Features:         loadFeatures(),
+		TLSEnabled:       env.GetBool("GRPC_TLS_ENABLED", false),
+		CertDir:          env.GetString("CERT_DIR", "/certs"),
 	}
 
 	return config

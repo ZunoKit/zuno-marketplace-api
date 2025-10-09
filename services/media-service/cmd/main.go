@@ -18,6 +18,7 @@ import (
 	"github.com/quangdang46/NFT-Marketplace/services/media-service/internal/service"
 	"github.com/quangdang46/NFT-Marketplace/shared/mongo"
 	mediaProto "github.com/quangdang46/NFT-Marketplace/shared/proto/media"
+	"github.com/quangdang46/NFT-Marketplace/shared/recovery"
 	"github.com/quangdang46/NFT-Marketplace/shared/redis"
 )
 
@@ -71,8 +72,21 @@ func main() {
 		pinataClient, // Storage
 	)
 
-	// Initialize gRPC server
-	server := grpc.NewServer()
+	// Create panic handler
+	panicHandler := recovery.NewPanicHandler(
+		recovery.WithStackLogging(true),
+		recovery.WithPanicCallback(func(recovered interface{}, stack []byte) {
+			log.Printf("PANIC recovered in media-service: %v\n%s", recovered, stack)
+		}),
+	)
+
+	// Initialize gRPC server with panic recovery
+	server := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			panicHandler.UnaryServerInterceptor(),
+		),
+		grpc.StreamInterceptor(panicHandler.StreamServerInterceptor()),
+	)
 	grpcHandler := grpc_handler.NewgRPCHandler(mediaService)
 	mediaProto.RegisterMediaServiceServer(server, grpcHandler)
 

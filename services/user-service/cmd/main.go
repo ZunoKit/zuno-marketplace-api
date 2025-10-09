@@ -15,6 +15,7 @@ import (
 	"github.com/quangdang46/NFT-Marketplace/shared/messaging"
 	"github.com/quangdang46/NFT-Marketplace/shared/postgres"
 	protoUser "github.com/quangdang46/NFT-Marketplace/shared/proto/user"
+	"github.com/quangdang46/NFT-Marketplace/shared/recovery"
 )
 
 func main() {
@@ -43,7 +44,21 @@ func main() {
 	eventPublisher := events.NewEventPublisher(amqpClient)
 	userService := service.NewUserService(userRepo, eventPublisher)
 
-	server := grpc.NewServer()
+	// Create panic handler
+	panicHandler := recovery.NewPanicHandler(
+		recovery.WithStackLogging(true),
+		recovery.WithPanicCallback(func(recovered interface{}, stack []byte) {
+			log.Printf("PANIC recovered in user-service: %v\n%s", recovered, stack)
+		}),
+	)
+
+	// Create gRPC server with panic recovery
+	server := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			panicHandler.UnaryServerInterceptor(),
+		),
+		grpc.StreamInterceptor(panicHandler.StreamServerInterceptor()),
+	)
 	handler := grpc_handler.NewgRPCHandler(server, userService)
 	protoUser.RegisterUserServiceServer(server, handler)
 

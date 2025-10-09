@@ -30,16 +30,20 @@ type Nonce struct {
 }
 
 type Session struct {
-	ID          SessionID
-	UserID      UserID
-	RefreshHash string // HASH(refreshToken)
-	ExpiresAt   time.Time
-	CreatedAt   time.Time
-	RevokedAt   *time.Time
-	DeviceID    *string
-	IP          *string
-	UA          *string
-	LastUsedAt  *time.Time
+	ID                  SessionID
+	UserID              UserID
+	RefreshHash         string  // HASH(refreshToken)
+	PreviousRefreshHash *string // HASH of previous refresh token (for rotation)
+	TokenFamilyID       string  // UUID to track token families
+	TokenGeneration     int     // Generation number of token
+	ExpiresAt           time.Time
+	CreatedAt           time.Time
+	RevokedAt           *time.Time
+	RevokedReason       *string // Reason for revocation (e.g., replay_attack, user_logout)
+	DeviceID            *string
+	IP                  *string
+	UA                  *string
+	LastUsedAt          *time.Time
 	// Optional JSON context for collection preparation, stored as JSON string
 	CollectionIntentContext *string
 }
@@ -78,4 +82,11 @@ type AuthRepository interface {
 	GetSessionByRefreshHash(ctx context.Context, refreshHash string) (*Session, error)
 	UpdateSessionLastUsed(ctx context.Context, sessionID SessionID) error
 	RevokeSession(ctx context.Context, sessionID SessionID) error
+	RevokeSessionWithReason(ctx context.Context, sessionID SessionID, reason string) error
+
+	// Token Rotation
+	RotateRefreshToken(ctx context.Context, sessionID SessionID, newRefreshHash string) error
+	GetSessionsByTokenFamily(ctx context.Context, tokenFamilyID string) ([]*Session, error)
+	RevokeTokenFamily(ctx context.Context, tokenFamilyID string, reason string) error
+	CheckTokenReuse(ctx context.Context, refreshHash string) (bool, error)
 }

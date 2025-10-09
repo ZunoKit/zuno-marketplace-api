@@ -66,6 +66,34 @@ func (m *MockAuthRepository) RevokeSession(ctx context.Context, sessionID domain
 	return args.Error(0)
 }
 
+func (m *MockAuthRepository) RevokeSessionWithReason(ctx context.Context, sessionID domain.SessionID, reason string) error {
+	args := m.Called(ctx, sessionID, reason)
+	return args.Error(0)
+}
+
+func (m *MockAuthRepository) RotateRefreshToken(ctx context.Context, sessionID domain.SessionID, newRefreshHash string) error {
+	args := m.Called(ctx, sessionID, newRefreshHash)
+	return args.Error(0)
+}
+
+func (m *MockAuthRepository) GetSessionsByTokenFamily(ctx context.Context, tokenFamilyID string) ([]*domain.Session, error) {
+	args := m.Called(ctx, tokenFamilyID)
+	if got := args.Get(0); got != nil {
+		return got.([]*domain.Session), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockAuthRepository) RevokeTokenFamily(ctx context.Context, tokenFamilyID string, reason string) error {
+	args := m.Called(ctx, tokenFamilyID, reason)
+	return args.Error(0)
+}
+
+func (m *MockAuthRepository) CheckTokenReuse(ctx context.Context, refreshHash string) (bool, error) {
+	args := m.Called(ctx, refreshHash)
+	return args.Bool(0), args.Error(1)
+}
+
 // AuthServiceTestSuite defines the test suite for AuthService
 type AuthServiceTestSuite struct {
 	suite.Suite
@@ -119,7 +147,9 @@ func (suite *AuthServiceTestSuite) TestRefreshSession_Success() {
 		LastUsedAt:  nil,
 	}
 
+	suite.mockRepo.On("CheckTokenReuse", ctx, mock.AnythingOfType("string")).Return(false, nil)
 	suite.mockRepo.On("GetSessionByRefreshHash", ctx, mock.AnythingOfType("string")).Return(mockSession, nil)
+	suite.mockRepo.On("RotateRefreshToken", ctx, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil)
 	suite.mockRepo.On("UpdateSessionLastUsed", ctx, mock.Anything).Return(nil)
 
 	result, err := suite.authService.Refresh(ctx, refreshToken)

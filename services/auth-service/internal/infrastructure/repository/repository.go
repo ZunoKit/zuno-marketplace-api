@@ -122,8 +122,12 @@ func (r *Repository) TryUseNonce(ctx context.Context, nonceValue, accountID, cha
 
 func (r *Repository) CreateSession(ctx context.Context, session *domain.Session) error {
 	query := `
-		INSERT INTO sessions (session_id, user_id, device_id, refresh_hash, ip_address, user_agent, created_at, expires_at, last_used_at, collection_intent_context)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		INSERT INTO sessions (
+			session_id, user_id, device_id, refresh_hash, previous_refresh_hash,
+			token_family_id, token_generation, ip_address, user_agent, 
+			created_at, expires_at, last_used_at, collection_intent_context
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 	`
 
 	_, err := r.postgres.GetClient().ExecContext(ctx, query,
@@ -131,6 +135,9 @@ func (r *Repository) CreateSession(ctx context.Context, session *domain.Session)
 		session.UserID,
 		session.DeviceID,
 		session.RefreshHash,
+		session.PreviousRefreshHash,
+		session.TokenFamilyID,
+		session.TokenGeneration,
 		session.IP,
 		session.UA,
 		session.CreatedAt,
@@ -148,7 +155,9 @@ func (r *Repository) CreateSession(ctx context.Context, session *domain.Session)
 
 func (r *Repository) GetSession(ctx context.Context, sessionID domain.SessionID) (*domain.Session, error) {
 	query := `
-		SELECT session_id, user_id, device_id, refresh_hash, ip_address, user_agent, created_at, expires_at, revoked_at, last_used_at
+		SELECT session_id, user_id, device_id, refresh_hash, previous_refresh_hash,
+		       token_family_id, token_generation, ip_address, user_agent, 
+		       created_at, expires_at, revoked_at, revoked_reason, last_used_at
 		FROM sessions
 		WHERE session_id = $1 AND revoked_at IS NULL
 	`
@@ -161,11 +170,15 @@ func (r *Repository) GetSession(ctx context.Context, sessionID domain.SessionID)
 		&session.UserID,
 		&session.DeviceID,
 		&session.RefreshHash,
+		&session.PreviousRefreshHash,
+		&session.TokenFamilyID,
+		&session.TokenGeneration,
 		&session.IP,
 		&session.UA,
 		&session.CreatedAt,
 		&session.ExpiresAt,
 		&session.RevokedAt,
+		&session.RevokedReason,
 		&session.LastUsedAt,
 	)
 
@@ -181,7 +194,9 @@ func (r *Repository) GetSession(ctx context.Context, sessionID domain.SessionID)
 
 func (r *Repository) GetSessionByRefreshHash(ctx context.Context, refreshHash string) (*domain.Session, error) {
 	query := `
-		SELECT session_id, user_id, device_id, refresh_hash, ip_address, user_agent, created_at, expires_at, revoked_at, last_used_at
+		SELECT session_id, user_id, device_id, refresh_hash, previous_refresh_hash,
+		       token_family_id, token_generation, ip_address, user_agent,
+		       created_at, expires_at, revoked_at, revoked_reason, last_used_at
 		FROM sessions
 		WHERE refresh_hash = $1 AND revoked_at IS NULL AND expires_at > now()
 	`
@@ -194,11 +209,15 @@ func (r *Repository) GetSessionByRefreshHash(ctx context.Context, refreshHash st
 		&session.UserID,
 		&session.DeviceID,
 		&session.RefreshHash,
+		&session.PreviousRefreshHash,
+		&session.TokenFamilyID,
+		&session.TokenGeneration,
 		&session.IP,
 		&session.UA,
 		&session.CreatedAt,
 		&session.ExpiresAt,
 		&session.RevokedAt,
+		&session.RevokedReason,
 		&session.LastUsedAt,
 	)
 
@@ -258,4 +277,136 @@ func (r *Repository) RevokeSession(ctx context.Context, sessionID domain.Session
 	}
 
 	return nil
+}
+
+// RevokeSessionWithReason revokes a session with a specific reason
+func (r *Repository) RevokeSessionWithReason(ctx context.Context, sessionID domain.SessionID, reason string) error {
+	query := `
+		UPDATE sessions 
+		SET revoked_at = now(), revoked_reason = $2
+		WHERE session_id = $1 AND revoked_at IS NULL
+	`
+
+	result, err := r.postgres.GetClient().ExecContext(ctx, query, sessionID, reason)
+	if err != nil {
+		return fmt.Errorf("failed to revoke session with reason: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("session not found or already revoked")
+	}
+
+	return nil
+}
+
+// RotateRefreshToken updates the refresh token for a session (token rotation)
+func (r *Repository) RotateRefreshToken(ctx context.Context, sessionID domain.SessionID, newRefreshHash string) error {
+	query := `
+		UPDATE sessions 
+		SET previous_refresh_hash = refresh_hash,
+		    refresh_hash = $2,
+		    token_generation = token_generation + 1,
+		    last_used_at = now()
+		WHERE session_id = $1 AND revoked_at IS NULL
+	`
+
+	result, err := r.postgres.GetClient().ExecContext(ctx, query, sessionID, newRefreshHash)
+	if err != nil {
+		return fmt.Errorf("failed to rotate refresh token: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("session not found or already revoked")
+	}
+
+	return nil
+}
+
+// GetSessionsByTokenFamily gets all sessions in a token family
+func (r *Repository) GetSessionsByTokenFamily(ctx context.Context, tokenFamilyID string) ([]*domain.Session, error) {
+	query := `
+		SELECT session_id, user_id, device_id, refresh_hash, previous_refresh_hash,
+		       token_family_id, token_generation, ip_address, user_agent,
+		       created_at, expires_at, revoked_at, revoked_reason, last_used_at
+		FROM sessions
+		WHERE token_family_id = $1
+		ORDER BY token_generation DESC
+	`
+
+	rows, err := r.postgres.GetClient().QueryContext(ctx, query, tokenFamilyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sessions by token family: %w", err)
+	}
+	defer rows.Close()
+
+	var sessions []*domain.Session
+	for rows.Next() {
+		var session domain.Session
+		err := rows.Scan(
+			&session.ID,
+			&session.UserID,
+			&session.DeviceID,
+			&session.RefreshHash,
+			&session.PreviousRefreshHash,
+			&session.TokenFamilyID,
+			&session.TokenGeneration,
+			&session.IP,
+			&session.UA,
+			&session.CreatedAt,
+			&session.ExpiresAt,
+			&session.RevokedAt,
+			&session.RevokedReason,
+			&session.LastUsedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan session: %w", err)
+		}
+		sessions = append(sessions, &session)
+	}
+
+	return sessions, nil
+}
+
+// RevokeTokenFamily revokes all sessions in a token family
+func (r *Repository) RevokeTokenFamily(ctx context.Context, tokenFamilyID string, reason string) error {
+	query := `
+		UPDATE sessions 
+		SET revoked_at = now(), revoked_reason = $2
+		WHERE token_family_id = $1 AND revoked_at IS NULL
+	`
+
+	_, err := r.postgres.GetClient().ExecContext(ctx, query, tokenFamilyID, reason)
+	if err != nil {
+		return fmt.Errorf("failed to revoke token family: %w", err)
+	}
+
+	return nil
+}
+
+// CheckTokenReuse checks if a refresh token hash has been used before (found in previous_refresh_hash)
+func (r *Repository) CheckTokenReuse(ctx context.Context, refreshHash string) (bool, error) {
+	query := `
+		SELECT EXISTS(
+			SELECT 1 FROM sessions 
+			WHERE previous_refresh_hash = $1
+		)
+	`
+
+	var exists bool
+	err := r.postgres.GetClient().QueryRowContext(ctx, query, refreshHash).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check token reuse: %w", err)
+	}
+
+	return exists, nil
 }

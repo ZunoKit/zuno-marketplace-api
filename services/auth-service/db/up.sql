@@ -41,12 +41,16 @@ CREATE TABLE IF NOT EXISTS sessions (
     user_id      uuid         NOT NULL,                  -- tham chiếu user service
     device_id    uuid,                                   -- tuỳ chọn theo dõi thiết bị
     refresh_hash varchar(128) NOT NULL,                  -- HASH của refresh token
+    previous_refresh_hash varchar(128),                  -- HASH của refresh token cũ (for rotation)
+    token_family_id uuid     NOT NULL DEFAULT gen_random_uuid(), -- ID để track token family
+    token_generation integer NOT NULL DEFAULT 1,         -- Generation number của token
     ip_address   inet,                                   -- IP client
     user_agent   text,                                   -- UA client
     created_at   timestamptz  NOT NULL DEFAULT now(),
     expires_at   timestamptz  NOT NULL,                  -- hết hạn session
     revoked_at   timestamptz,                            -- khi bị revoke
-    last_used_at timestamptz  DEFAULT now()              -- hoạt động gần nhất
+    last_used_at timestamptz  DEFAULT now(),             -- hoạt động gần nhất
+    revoked_reason varchar(255)                          -- Lý do revoke (replay_attack, user_logout, etc.)
 );
 
 -- Nếu gen_random_uuid() không tồn tại (pgcrypto chưa bật), fallback sang uuid-ossp
@@ -62,6 +66,8 @@ $$;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_sessions_refresh_hash ON sessions(refresh_hash);
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id           ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires_at        ON sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_sessions_token_family     ON sessions(token_family_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_prev_refresh     ON sessions(previous_refresh_hash);
 
 -- Partial index: truy vấn session active theo user nhanh
 CREATE INDEX IF NOT EXISTS idx_sessions_active_by_user

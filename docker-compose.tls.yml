@@ -1,0 +1,140 @@
+# Docker Compose override for TLS configuration
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.tls.yml up
+
+version: '3.8'
+
+services:
+  auth-service:
+    environment:
+      - GRPC_TLS_ENABLED=true
+      - CERT_DIR=/certs
+    volumes:
+      - ./infra/certs:/certs:ro
+    depends_on:
+      - cert-generator
+
+  user-service:
+    environment:
+      - GRPC_TLS_ENABLED=true
+      - CERT_DIR=/certs
+    volumes:
+      - ./infra/certs:/certs:ro
+    depends_on:
+      - cert-generator
+
+  wallet-service:
+    environment:
+      - GRPC_TLS_ENABLED=true
+      - CERT_DIR=/certs
+    volumes:
+      - ./infra/certs:/certs:ro
+    depends_on:
+      - cert-generator
+
+  orchestrator-service:
+    environment:
+      - GRPC_TLS_ENABLED=true
+      - CERT_DIR=/certs
+    volumes:
+      - ./infra/certs:/certs:ro
+    depends_on:
+      - cert-generator
+
+  media-service:
+    environment:
+      - GRPC_TLS_ENABLED=true
+      - CERT_DIR=/certs
+    volumes:
+      - ./infra/certs:/certs:ro
+    depends_on:
+      - cert-generator
+
+  chain-registry-service:
+    environment:
+      - GRPC_TLS_ENABLED=true
+      - CERT_DIR=/certs
+    volumes:
+      - ./infra/certs:/certs:ro
+    depends_on:
+      - cert-generator
+
+  catalog-service:
+    environment:
+      - GRPC_TLS_ENABLED=true
+      - CERT_DIR=/certs
+    volumes:
+      - ./infra/certs:/certs:ro
+    depends_on:
+      - cert-generator
+
+  indexer-service:
+    environment:
+      - GRPC_TLS_ENABLED=true
+      - CERT_DIR=/certs
+    volumes:
+      - ./infra/certs:/certs:ro
+    depends_on:
+      - cert-generator
+
+  graphql-gateway:
+    environment:
+      - GRPC_TLS_ENABLED=true
+      - CERT_DIR=/certs
+    volumes:
+      - ./infra/certs:/certs:ro
+    depends_on:
+      - cert-generator
+
+  # Certificate generator service (runs once)
+  cert-generator:
+    image: alpine:latest
+    container_name: cert-generator
+    volumes:
+      - ./infra/certs:/certs
+    command: |
+      sh -c "
+        if [ ! -f /certs/ca.crt ]; then
+          apk add --no-cache openssl
+          cd /certs
+          
+          # Generate CA key and certificate
+          openssl genpkey -algorithm RSA -out ca.key -pkeyopt rsa_keygen_bits:4096
+          openssl req -new -x509 -days 3650 -key ca.key -out ca.crt \
+            -subj '/C=US/ST=CA/L=San Francisco/O=Zuno Marketplace/OU=Engineering/CN=Zuno Marketplace CA'
+          
+          # Generate service certificates
+          for service in auth-service user-service wallet-service orchestrator-service media-service chain-registry-service catalog-service indexer-service graphql-gateway; do
+            openssl genpkey -algorithm RSA -out \$service.key -pkeyopt rsa_keygen_bits:4096
+            openssl req -new -key \$service.key -out \$service.csr \
+              -subj \"/C=US/ST=CA/L=San Francisco/O=Zuno Marketplace/OU=Engineering/CN=\$service.zuno-marketplace.local\"
+            
+            # Create extensions file
+            echo \"subjectAltName = DNS:\$service,DNS:localhost,IP:127.0.0.1\" > \$service.ext
+            echo \"keyUsage = digitalSignature, keyEncipherment\" >> \$service.ext
+            echo \"extendedKeyUsage = serverAuth\" >> \$service.ext
+            
+            # Sign with CA
+            openssl x509 -req -in \$service.csr -CA ca.crt -CAkey ca.key -CAcreateserial \
+              -out \$service.crt -days 3650 -extfile \$service.ext
+            
+            rm \$service.csr \$service.ext
+          done
+          
+          # Generate client certificate for gateway
+          openssl genpkey -algorithm RSA -out graphql-gateway-client.key -pkeyopt rsa_keygen_bits:4096
+          openssl req -new -key graphql-gateway-client.key -out graphql-gateway-client.csr \
+            -subj '/C=US/ST=CA/L=San Francisco/O=Zuno Marketplace/OU=Engineering/CN=graphql-gateway-client'
+          
+          echo 'keyUsage = digitalSignature, keyEncipherment' > client.ext
+          echo 'extendedKeyUsage = clientAuth' >> client.ext
+          
+          openssl x509 -req -in graphql-gateway-client.csr -CA ca.crt -CAkey ca.key -CAcreateserial \
+            -out graphql-gateway-client.crt -days 3650 -extfile client.ext
+          
+          rm graphql-gateway-client.csr client.ext
+          
+          echo 'Certificates generated successfully!'
+        else
+          echo 'Certificates already exist, skipping generation.'
+        fi
+      "

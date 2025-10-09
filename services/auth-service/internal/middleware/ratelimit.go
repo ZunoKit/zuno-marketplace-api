@@ -19,6 +19,8 @@ type RateLimiter struct {
 	rate            int           // requests per window
 	window          time.Duration // time window
 	cleanupInterval time.Duration
+	done            chan struct{} // Channel to signal goroutine shutdown
+	closed          bool          // Flag to prevent multiple closes
 }
 
 type clientInfo struct {
@@ -33,6 +35,8 @@ func NewRateLimiter(rate int, window time.Duration) *RateLimiter {
 		rate:            rate,
 		window:          window,
 		cleanupInterval: window * 2,
+		done:            make(chan struct{}),
+		closed:          false,
 	}
 
 	// Start cleanup goroutine
@@ -116,17 +120,36 @@ func (rl *RateLimiter) cleanup() {
 	ticker := time.NewTicker(rl.cleanupInterval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		now := time.Now()
-		rl.mu.Lock()
+	for {
+		select {
+		case <-ticker.C:
+			now := time.Now()
+			rl.mu.Lock()
 
-		for clientID, client := range rl.clients {
-			if now.Sub(client.windowStart) > rl.window*2 {
-				delete(rl.clients, clientID)
+			for clientID, client := range rl.clients {
+				if now.Sub(client.windowStart) > rl.window*2 {
+					delete(rl.clients, clientID)
+				}
 			}
-		}
 
-		rl.mu.Unlock()
+			rl.mu.Unlock()
+		case <-rl.done:
+			// Gracefully shutdown cleanup goroutine
+			return
+		}
+	}
+}
+
+// Close gracefully shuts down the rate limiter
+func (rl *RateLimiter) Close() {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	if !rl.closed {
+		close(rl.done)
+		rl.closed = true
+		// Clear all clients
+		rl.clients = make(map[string]*clientInfo)
 	}
 }
 

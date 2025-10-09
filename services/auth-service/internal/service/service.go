@@ -151,17 +151,25 @@ func (s *Service) VerifySiwe(ctx context.Context, accountID, message, signature 
 
 	// Create session
 	sessionID := uuid.New().String()
-	refreshToken := s.generateRefreshToken()
+	refreshToken, err := s.generateRefreshToken()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate refresh token: %w", err)
+	}
 	refreshHash := s.hashRefreshToken(refreshToken)
+
+	// Generate token family ID for tracking token chains
+	tokenFamilyID := uuid.New().String()
 
 	now := time.Now()
 	session := &domain.Session{
-		ID:          domain.SessionID(sessionID),
-		UserID:      domain.UserID(userResp.GetUserId()),
-		RefreshHash: refreshHash,
-		ExpiresAt:   now.Add(s.sessionTTL),
-		CreatedAt:   now,
-		LastUsedAt:  &now,
+		ID:              domain.SessionID(sessionID),
+		UserID:          domain.UserID(userResp.GetUserId()),
+		RefreshHash:     refreshHash,
+		TokenFamilyID:   tokenFamilyID,
+		TokenGeneration: 1, // First generation
+		ExpiresAt:       now.Add(s.sessionTTL),
+		CreatedAt:       now,
+		LastUsedAt:      &now,
 	}
 
 	// Optionally attach collection intent context when feature enabled and header present
@@ -240,21 +248,61 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (*domain.Aut
 	// Hash the refresh token to find the session
 	refreshHash := s.hashRefreshToken(refreshToken)
 
+	// Check if this is a reused token (replay attack detection)
+	isReused, err := s.authRepo.CheckTokenReuse(ctx, refreshHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check token reuse: %w", err)
+	}
+
+	// If token was already used (found in previous_refresh_hash), it's a replay attack
+	if isReused {
+		// Find the session that had this as a previous token
+		session, _ := s.authRepo.GetSessionByRefreshHash(ctx, refreshHash)
+		if session != nil {
+			// Revoke entire token family due to suspected compromise
+			_ = s.authRepo.RevokeTokenFamily(ctx, session.TokenFamilyID, "replay_attack_detected")
+			log.Printf("SECURITY: Replay attack detected for token family %s, user %s",
+				session.TokenFamilyID, session.UserID)
+		}
+		return nil, fmt.Errorf("refresh token has been compromised - all sessions revoked")
+	}
+
 	// Find active session by refresh token hash
 	session, err := s.authRepo.GetSessionByRefreshHash(ctx, refreshHash)
 	if err != nil {
 		return nil, fmt.Errorf("invalid or expired refresh token: %w", err)
 	}
 
-	// Double-check session hasn't expired (additional safety check)
+	// Check if session is revoked
+	if session.RevokedAt != nil {
+		return nil, fmt.Errorf("session has been revoked")
+	}
+
+	// Double-check session hasn't expired
 	if time.Now().After(session.ExpiresAt) {
 		return nil, fmt.Errorf("session has expired")
+	}
+
+	// Generate new refresh token for rotation
+	newRefreshToken, err := s.generateRefreshToken()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate new refresh token: %w", err)
+	}
+
+	// Hash the new refresh token
+	newRefreshHash := s.hashRefreshToken(newRefreshToken)
+
+	// Update session with new refresh token (rotation)
+	// This will move current refresh_hash to previous_refresh_hash
+	// and set the new refresh_hash
+	if err := s.authRepo.RotateRefreshToken(ctx, session.ID, newRefreshHash); err != nil {
+		return nil, fmt.Errorf("failed to rotate refresh token: %w", err)
 	}
 
 	// Update session last used timestamp
 	if err := s.authRepo.UpdateSessionLastUsed(ctx, session.ID); err != nil {
 		// Log warning but don't fail the refresh operation
-		// In production, you might want to log this error
+		log.Printf("warning: failed to update last_used_at for session %s: %v", session.ID, err)
 	}
 
 	// Generate new access token
@@ -263,21 +311,14 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (*domain.Aut
 		return nil, fmt.Errorf("failed to generate new access token: %w", err)
 	}
 
-	// For security, we could optionally generate a new refresh token
-	// For now, we'll reuse the existing one to keep the session alive
-	// In high-security environments, you might want to rotate refresh tokens
-
-	// Optionally fetch user's primary wallet address and chain ID
-	// For performance, we'll leave these empty in the refresh response
-	// The client can use the user ID to fetch this information if needed
-
-	// Audit: session refresh
-	log.Printf("audit|event=session_refresh|session_id=%s|user_id=%s|timestamp=%s",
-		string(session.ID), string(session.UserID), time.Now().UTC().Format(time.RFC3339Nano))
+	// Audit: session refresh with rotation
+	log.Printf("audit|event=session_refresh_rotated|session_id=%s|user_id=%s|token_family=%s|generation=%d|timestamp=%s",
+		string(session.ID), string(session.UserID), session.TokenFamilyID,
+		session.TokenGeneration+1, time.Now().UTC().Format(time.RFC3339Nano))
 
 	return &domain.AuthResult{
 		AccessToken:  accessToken,
-		RefreshToken: refreshToken, // Reusing existing refresh token
+		RefreshToken: newRefreshToken, // Return NEW refresh token (rotation)
 		ExpiresAt:    expiresAt,
 		UserID:       session.UserID,
 		Address:      "", // Not included in refresh response for performance
@@ -424,10 +465,13 @@ func (s *Service) validateSiweMessage(message *siwe.Message, expectedAccountID s
 }
 
 // generateRefreshToken generates a cryptographically secure refresh token
-func (s *Service) generateRefreshToken() string {
+func (s *Service) generateRefreshToken() (string, error) {
 	bytes := make([]byte, 32)
-	rand.Read(bytes)
-	return hex.EncodeToString(bytes)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate random bytes: %w", err)
+	}
+	return hex.EncodeToString(bytes), nil
 }
 
 // hashRefreshToken creates a hash of the refresh token for storage
