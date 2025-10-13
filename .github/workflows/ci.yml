@@ -356,10 +356,9 @@ jobs:
         uses: golangci/golangci-lint-action@v5
         with:
           version: latest
+          install-mode: goinstall
           args: --timeout=10m
           skip-cache: false
-          skip-pkg-cache: false
-          skip-build-cache: false
 
   # Final status check
   ci-success:

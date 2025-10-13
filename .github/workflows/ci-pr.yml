@@ -87,5 +87,6 @@ jobs:
         uses: golangci/golangci-lint-action@v5
         with:
           version: latest
+          install-mode: goinstall
           args: --fast --timeout=5m
           skip-cache: false
