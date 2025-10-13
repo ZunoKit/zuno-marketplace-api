@@ -21,7 +21,8 @@
       "Bash(dir infradevelopmentk8s)",
       "Bash(dir infradevelopment)",
       "Bash(test:*)",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "Bash(md-tree:*)"
     ],
     "deny": [],
     "ask": []

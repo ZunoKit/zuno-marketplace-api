@@ -68,6 +68,12 @@ func SetupTestPostgres(ctx context.Context) (*TestDatabase, error) {
 		time.Sleep(1 * time.Second)
 	}
 
+	// Create auth_test schema for QA tests
+	_, err = db.Exec("CREATE SCHEMA IF NOT EXISTS auth_test")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create auth_test schema: %w", err)
+	}
+
 	return &TestDatabase{
 		Container: container,
 		DB:        db,
@@ -79,9 +85,12 @@ func SetupTestPostgres(ctx context.Context) (*TestDatabase, error) {
 func (td *TestDatabase) Cleanup(ctx context.Context) error {
 	if td.DB != nil {
 		td.DB.Close()
+		td.DB = nil
 	}
 	if td.Container != nil {
-		return td.Container.Terminate(ctx)
+		err := td.Container.Terminate(ctx)
+		td.Container = nil
+		return err
 	}
 	return nil
 }
