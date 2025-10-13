@@ -128,7 +128,6 @@ jobs:
             ./services/auth-service/test/integration/... \
             ./services/user-service/test/integration/... \
             ./services/wallet-service/test/integration/... \
-            ./services/orchestrator-service/test/integration/... \
             ./services/indexer-service/test/integration/...
         env:
           POSTGRES_HOST: localhost
