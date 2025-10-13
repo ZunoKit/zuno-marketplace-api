@@ -97,8 +97,8 @@ cd infra/development/build
 ./user-build.bat
 # ... etc for other services
 
-# Run linter
-golangci-lint run ./...
+# Run Go vet
+go vet ./...
 ```
 
 **Testing**
@@ -342,7 +342,7 @@ Each service manages its own schema in `services/{service-name}/db/up.sql`. Thes
 ### Code Style & Linting
 
 - Follow Go conventions and idioms
-- Run `golangci-lint` before committing
+- Run `go vet` and `go fmt` before committing
 - Max line length: 120 characters
 - Max function complexity: 15 (gocyclo)
 - Max function length: 100 lines / 50 statements
