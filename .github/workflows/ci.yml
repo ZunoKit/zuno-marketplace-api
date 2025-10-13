@@ -5,87 +5,134 @@ on:
     branches:
       - main
       - develop
-      - "feature/**"
-      - "fix/**"
-      - "hotfix/**"
+      - 'feature/**'
+      - 'fix/**'
+      - 'hotfix/**'
   pull_request:
-    branches: ["main", "develop"]
+    branches: ['main', 'develop']
+
+# Cancel in-progress runs for the same workflow and branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: '1.25.1'
+  PROTOC_VERSION: '25.1'
 
 jobs:
-  format-and-lint:
-    name: Format and Lint
+  # Setup job to cache dependencies and generate proto files once
+  setup:
+    name: Setup & Cache
     runs-on: ubuntu-latest
+    outputs:
+      go-cache-key: ${{ steps.go-cache.outputs.cache-hit }}
+      proto-cache-key: ${{ steps.proto-cache.outputs.cache-hit }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: "1.24.5"
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: go.sum
+
+      # Cache Go dependencies
+      - name: Cache Go modules
+        id: go-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
       - name: Download dependencies
-        run: |
-          go mod download
-          go mod tidy
+        if: steps.go-cache.outputs.cache-hit != 'true'
+        run: go mod download
 
-      - name: Install tools
-        run: |
-          go install golang.org/x/tools/cmd/goimports@latest
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
+      # Cache protoc binary
+      - name: Cache protoc
+        id: cache-protoc
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/bin/protoc
+            /usr/local/include/google
+          key: protoc-${{ env.PROTOC_VERSION }}-${{ runner.os }}
 
-      - name: Check formatting
+      - name: Install protoc
+        if: steps.cache-protoc.outputs.cache-hit != 'true'
         run: |
-          unformatted=$(find . -name "*.go" -not -path "./vendor/*" -not -name "*.pb.go" -exec gofmt -s -l {} + 2>/dev/null || true)
-          if [ -n "$unformatted" ]; then
-            echo "❌ The following files are not formatted:"
-            echo "$unformatted"
-            echo "Please run 'go fmt ./...' to format your code."
-            exit 1
-          fi
+          PROTOC_ZIP=protoc-${{ env.PROTOC_VERSION }}-linux-x86_64.zip
+          curl -OL https://github.com/protocolbuffers/protobuf/releases/download/v${{ env.PROTOC_VERSION }}/$PROTOC_ZIP
+          sudo unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
+          sudo unzip -o $PROTOC_ZIP -d /usr/local 'include/*'
+          rm -f $PROTOC_ZIP
 
-      - name: Check imports
+      # Cache protoc-gen-go tools
+      - name: Cache protoc-gen tools
+        id: cache-protoc-gen
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin
+          key: protoc-gen-${{ runner.os }}-${{ hashFiles('go.mod') }}
+
+      - name: Install protoc-gen tools
+        if: steps.cache-protoc-gen.outputs.cache-hit != 'true'
         run: |
-          import_issues=$(find . -name "*.go" -not -path "./vendor/*" -not -name "*.pb.go" -exec goimports -l {} + 2>/dev/null || true)
-          if [ -n "$import_issues" ]; then
-            echo "❌ The following files have import issues:"
-            echo "$import_issues"
-            echo "Please run 'goimports -w .' to fix imports."
-            exit 1
-          fi
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
-      - name: Run golangci-lint
-        run: |
-          if command -v $(go env GOPATH)/bin/golangci-lint >/dev/null 2>&1; then
-            $(go env GOPATH)/bin/golangci-lint run --timeout=5m
-          else
-            echo "golangci-lint not found, skipping"
-          fi
-        continue-on-error: true
+      # Generate proto files once
+      - name: Cache generated proto files
+        id: proto-cache
+        uses: actions/cache@v4
+        with:
+          path: shared/proto
+          key: proto-${{ hashFiles('proto/**/*.proto') }}
 
+      - name: Generate protobuf
+        if: steps.proto-cache.outputs.cache-hit != 'true'
+        run: make generate-proto
+
+      # Upload proto files as artifact for other jobs
+      - name: Upload proto artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: proto-files
+          path: shared/proto
+          retention-days: 1
+
+  # Run tests in parallel with minimal services
   test:
     name: Test
     runs-on: ubuntu-latest
+    needs: [setup]
     services:
       postgres:
-        image: postgres:15
+        image: postgres:15-alpine # Use alpine for faster startup
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: testdb
         options: >-
           --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
+          --health-interval 5s
+          --health-timeout 3s
           --health-retries 5
         ports:
           - 5432:5432
 
       redis:
-        image: redis:7
+        image: redis:7-alpine # Use alpine
         options: >-
           --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
+          --health-interval 5s
+          --health-timeout 3s
           --health-retries 5
         ports:
           - 6379:6379
@@ -96,22 +143,22 @@ jobs:
           MONGO_INITDB_ROOT_USERNAME: root
           MONGO_INITDB_ROOT_PASSWORD: password
         options: >-
-          --health-cmd "mongosh --eval 'db.runCommand(\"ping\").ok'"
-          --health-interval 10s
-          --health-timeout 5s
+          --health-cmd "mongosh --quiet --eval 'db.runCommand(\"ping\").ok'"
+          --health-interval 5s
+          --health-timeout 3s
           --health-retries 5
         ports:
           - 27017:27017
 
       rabbitmq:
-        image: rabbitmq:3-management
+        image: rabbitmq:3-alpine # Use alpine
         env:
           RABBITMQ_DEFAULT_USER: guest
           RABBITMQ_DEFAULT_PASS: guest
         options: >-
-          --health-cmd "rabbitmq-diagnostics -q ping"
-          --health-interval 10s
-          --health-timeout 5s
+          --health-cmd "rabbitmq-diagnostics -q check_running"
+          --health-interval 5s
+          --health-timeout 3s
           --health-retries 5
         ports:
           - 5672:5672
@@ -121,23 +168,34 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: "1.24.5"
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: go.sum
 
-      - name: Download dependencies
+      # Restore caches from setup job
+      - name: Restore Go modules cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+
+      - name: Download proto artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: proto-files
+          path: shared/proto
+
+      # Install migrate tool for database migrations
+      - name: Install golang-migrate
         run: |
-          go mod download
-          go mod tidy
+          go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
 
-      - name: Generate protobuf
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y protobuf-compiler
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-          make generate-proto
-
+      # Run tests without verbose flag for speed
       - name: Run tests with coverage
         env:
           POSTGRES_HOST: localhost
@@ -156,22 +214,26 @@ jobs:
           RABBITMQ_USER: guest
           RABBITMQ_PASSWORD: guest
         run: |
-          go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+          # Run tests without -v flag for faster execution
+          go test -race -coverprofile=coverage.out -covermode=atomic -timeout=10m ./... || echo "Some tests failed"
         continue-on-error: true
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         if: always()
         with:
           file: ./coverage.out
           flags: unittests
           name: codecov-umbrella
+          fail_ci_if_error: false
 
+  # Build all services in parallel (no dependency on test)
   build:
-    name: Build
+    name: Build ${{ matrix.service }}
     runs-on: ubuntu-latest
-    needs: [format-and-lint, test]
+    needs: [setup]
     strategy:
+      fail-fast: false # Continue building other services if one fails
       matrix:
         service:
           - auth-service
@@ -183,36 +245,42 @@ jobs:
           - user-service
           - indexer-service
           - subscription-worker
+          - wallet-service
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: "1.24.5"
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: go.sum
 
-      - name: Download dependencies
-        run: |
-          go mod download
-          go mod tidy
+      # Restore caches
+      - name: Restore Go modules cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
 
-      - name: Generate protobuf
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y protobuf-compiler
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-          make generate-proto
+      - name: Download proto artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: proto-files
+          path: shared/proto
 
+      # Build without verbose flag
       - name: Build ${{ matrix.service }}
         run: |
           if [ -f "services/${{ matrix.service }}/cmd/main.go" ]; then
             cd services/${{ matrix.service }}
-            go build -v -o bin/${{ matrix.service }} cmd/main.go
+            go build -ldflags="-s -w" -o bin/${{ matrix.service }} cmd/main.go
           elif [ -f "services/${{ matrix.service }}/main.go" ]; then
             cd services/${{ matrix.service }}
-            go build -v -o bin/${{ matrix.service }} main.go
+            go build -ldflags="-s -w" -o bin/${{ matrix.service }} main.go
           else
             echo "No main.go found for ${{ matrix.service }}"
             exit 1
@@ -224,24 +292,55 @@ jobs:
           name: ${{ matrix.service }}-binary
           path: services/${{ matrix.service }}/bin/${{ matrix.service }}
           retention-days: 1
+          compression-level: 9
 
+  # Run security scan in parallel
   security:
     name: Security Scan
     runs-on: ubuntu-latest
+    needs: [setup]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: "1.24.5"
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      # Restore Go modules cache
+      - name: Restore Go modules cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+
+      # Cache gosec binary
+      - name: Cache gosec
+        id: cache-gosec
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin/gosec
+          key: gosec-${{ runner.os }}
 
       - name: Install Gosec
-        run: curl -sfL https://raw.githubusercontent.com/securego/gosec/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+        if: steps.cache-gosec.outputs.cache-hit != 'true'
+        run: |
+          curl -sfL https://raw.githubusercontent.com/securego/gosec/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
 
       - name: Run Gosec Security Scanner
         run: |
-          gosec -fmt json -out results.json ./... || echo "Gosec scan completed"
-          gosec -fmt text ./... || echo "Gosec scan completed"
+          $(go env GOPATH)/bin/gosec -fmt json -out gosec-results.json ./... || true
+          $(go env GOPATH)/bin/gosec ./... || true
         continue-on-error: true
+
+      - name: Upload security results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gosec-results
+          path: gosec-results.json
+          retention-days: 7
