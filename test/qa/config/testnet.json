@@ -1,0 +1,26 @@
+{
+  "sepolia": {
+    "chainId": "eip155:11155111",
+    "name": "Sepolia Testnet",
+    "rpcEndpoints": [
+      {
+        "url": "https://sepolia.infura.io/v3/YOUR_KEY",
+        "priority": 1,
+        "timeout": 5000
+      },
+      {
+        "url": "https://rpc.sepolia.org",
+        "priority": 2,
+        "timeout": 10000
+      },
+      {
+        "url": "https://ethereum-sepolia-rpc.publicnode.com",
+        "priority": 3,
+        "timeout": 10000
+      }
+    ],
+    "fallbackToMock": true,
+    "maxRetries": 3,
+    "retryBackoff": "exponential"
+  }
+}

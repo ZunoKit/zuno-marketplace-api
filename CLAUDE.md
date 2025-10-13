@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Zuno Marketplace API** is a production-ready, high-performance, multi-chain NFT marketplace backend built with a microservices architecture. The system supports Ethereum, Polygon, BSC and other EVM-compatible chains with enterprise-grade security, monitoring, and scalability features.
 
+**Development Methodology**: This project uses **BMad Method** for brownfield development, emphasizing Test-Driven Development (TDD), risk assessment, and systematic quality assurance.
+
 ### Version 1.0.0 Production Features
 
 - **Security**: mTLS communication, refresh token rotation, device fingerprinting
@@ -184,6 +186,11 @@ Frontend → GraphQL Gateway/BFF (HTTP/WS) → gRPC Services
 
 ```
 .
+├── .bmad-core/                  # BMad Method framework
+│   ├── working-in-the-brownfield.md  # Brownfield workflow guide
+│   ├── agents/                 # Agent definitions (PM, Architect, QA)
+│   ├── workflows/              # Development workflows
+│   └── templates/              # Story and document templates
 ├── services/                    # All microservices
 │   ├── {service-name}/
 │   │   ├── cmd/                # Service entrypoint (main.go)
@@ -229,7 +236,14 @@ Frontend → GraphQL Gateway/BFF (HTTP/WS) → gRPC Services
 │       └── build/              # Build scripts
 ├── docs/                        # Documentation
 │   ├── architecture/           # System architecture docs
-│   └── knowledge/              # Feature implementation guides
+│   ├── flows/                  # Feature implementation flows
+│   │   ├── auth/              # Authentication flows
+│   │   ├── collection/        # Collection creation flows
+│   │   └── mint-nft/          # NFT minting flows
+│   ├── prd/                   # Product Requirements Documents
+│   ├── stories/               # Development stories
+│   └── qa/                    # QA assessments and reports
+│       └── assessments/       # Risk, design, review documents
 └── zuno-marketplace-contracts/  # Solidity smart contracts
 ```
 
@@ -268,9 +282,47 @@ Frontend → GraphQL Gateway/BFF (HTTP/WS) → gRPC Services
 
 ## Important Development Notes
 
+### BMad Method & Brownfield Development
+
+This project follows **BMad Method** for systematic brownfield development. Key workflows:
+
+**Development Workflow Reference:**
+
+- **Primary Guide**: `.bmad-core/working-in-the-brownfield.md` - Complete brownfield workflow
+- **Architecture**: `docs/architecture.md` - Current system state
+- **PRD**: `docs/prd.md` - Product requirements and epics
+- **Stories**: `docs/stories/` - Individual development stories
+- **QA**: `docs/qa/assessments/` - Risk assessments and test designs
+
+**Test Architect Workflow (Brownfield):**
+
+All brownfield work MUST follow this QA workflow:
+
+```bash
+# Stage 1: BEFORE Development (Risk & Strategy)
+@qa *risk {story}     # Assess regression risks & integration points
+@qa *design {story}   # Plan test strategy (regression + new features)
+
+# Stage 2: DURING Development (Continuous Validation)
+@qa *trace {story}    # Verify requirement coverage
+@qa *nfr {story}      # Validate performance & security
+
+# Stage 3: CODE REVIEW (Deep Integration Analysis)
+@qa *review {story}   # Comprehensive review with active refactoring
+
+# Stage 4: POST-REVIEW (Gate Decision)
+@qa *gate {story}     # Update quality gate decision
+```
+
+**Brownfield Decision Tree:**
+
+- Does change touch legacy code? → Test Architect is MANDATORY
+- Is this major enhancement? → Full workflow (*risk → *design → development)
+- Is this bug fix touching critical paths? → At minimum run \*risk
+
 ### RED-GREEN-REFACTOR Methodology (MANDATORY)
 
-**EVERY code change MUST follow this cycle:**
+**EVERY code change MUST follow this TDD cycle:**
 
 1. **🔴 RED**: Write failing tests FIRST (no exceptions)
 
@@ -289,6 +341,13 @@ Frontend → GraphQL Gateway/BFF (HTTP/WS) → gRPC Services
    - Optimize performance if needed
    - Run tests after each refactor to ensure nothing breaks
 
+**Integration with BMad Method:**
+
+- Run `@qa *design` to get test strategy BEFORE writing tests
+- Follow test design document during RED phase
+- Run `@qa *trace` mid-development to verify coverage
+- Run `@qa *review` after code complete before committing
+
 **FORBIDDEN PRACTICES:**
 
 - ❌ Writing implementation before tests
@@ -296,6 +355,7 @@ Frontend → GraphQL Gateway/BFF (HTTP/WS) → gRPC Services
 - ❌ Leaving any tests failing
 - ❌ Committing code with failing tests
 - ❌ Making untested code changes
+- ❌ Skipping QA workflow for brownfield changes
 
 **Test Requirements:**
 
@@ -304,6 +364,7 @@ Frontend → GraphQL Gateway/BFF (HTTP/WS) → gRPC Services
 - E2E tests for complete user flows
 - Minimum 80% code coverage for new code
 - All edge cases and error paths must be tested
+- Regression tests for touched legacy code
 
 ### Protobuf Changes
 
@@ -388,39 +449,40 @@ Follow conventional commits as defined in `.cursor/rules/commit-message.mdc`:
 
 ## Key Documentation References
 
-**Project Management**:
+**BMad Method & Development Process**:
 
-- **Task tracking**: `TASKS.md` - All 25 production readiness tasks (100% complete ✅)
-- **Critical fixes**: `CRITICAL-FIXES.md` - All 3 blocking issues RESOLVED ✅
-- **Production checklist**: `PRODUCTION-CHECKLIST.md` - Comprehensive pre-deployment checklist (9 phases, 4-6 hours)
-- **Post-launch roadmap**: `POST-LAUNCH-TASKS.md` - 15 recommended improvements for months 1-3
+- **Brownfield Guide**: `.bmad-core/working-in-the-brownfield.md` - Complete brownfield workflow
+- **PRD**: `docs/prd.md` - Product requirements and epics (Epic 1-4)
+- **Stories**: `docs/stories/` - Development stories with acceptance criteria
+- **QA Assessments**: `docs/qa/assessments/` - Risk profiles, test designs, reviews
 
 **Architecture**:
 
-- System overview: `docs/architecture/system-overview.md`
-- Database schema: `docs/architecture/database-schema.md`
-- Database diagrams: `docs/architecture/database-diagram.md`
+- **Architecture Overview**: `docs/architecture.md` - Complete system architecture
+- System overview: `docs/flows/overview/system-overview.md`
+- Database schema: `docs/flows/overview/database-schema.md`
+- Database diagrams: `docs/flows/overview/database-diagram.md`
 
-**Authentication**:
+**Authentication Flows**:
 
-- Auth overview: `docs/knowledge/auth/authentication-overview.md`
-- SIWE sign-in: `docs/knowledge/auth/1-siwe-signin-flow.md`
-- Session refresh: `docs/knowledge/auth/2-session-refresh-flow.md`
-- WebSocket auth: `docs/knowledge/auth/6-websocket-auth-flow.md`
+- Auth overview: `docs/flows/auth/authentication-overview.md`
+- SIWE sign-in: `docs/flows/auth/1-siwe-signin-flow.md`
+- Session refresh: `docs/flows/auth/2-session-refresh-flow.md`
+- WebSocket auth: `docs/flows/auth/6-websocket-auth-flow.md`
 
-**Collection Creation**:
+**Collection Creation Flows**:
 
-- Overview: `docs/knowledge/collection/collection-overview.md`
-- Media upload: `docs/knowledge/collection/1-media-upload-flow.md`
-- Collection preparation: `docs/knowledge/collection/2-collection-preparation-flow.md`
-- Contract deployment: `docs/knowledge/collection/3-contract-deployment-flow.md`
+- Overview: `docs/flows/collection/collection-overview.md`
+- Media upload: `docs/flows/collection/1-media-upload-flow.md`
+- Collection preparation: `docs/flows/collection/2-collection-preparation-flow.md`
+- Contract deployment: `docs/flows/collection/3-contract-deployment-flow.md`
 
-**Minting**:
+**NFT Minting Flows**:
 
-- Overview: `docs/knowledge/mint-nft/minting-overview.md`
-- Intent creation: `docs/knowledge/mint-nft/1-intent-creation-flow.md`
-- Transaction broadcast: `docs/knowledge/mint-nft/2-transaction-broadcast-flow.md`
-- Event processing: `docs/knowledge/mint-nft/4-event-processing-flow.md`
+- Overview: `docs/flows/mint-nft/minting-overview.md`
+- Intent creation: `docs/flows/mint-nft/1-intent-creation-flow.md`
+- Transaction broadcast: `docs/flows/mint-nft/2-transaction-broadcast-flow.md`
+- Event processing: `docs/flows/mint-nft/4-event-processing-flow.md`
 
 ## Production Features (v1.0.0)
 
@@ -497,41 +559,113 @@ Follow conventional commits as defined in `.cursor/rules/commit-message.mdc`:
 ### Production Readiness Status
 
 - **Version**: 1.0.0 (Production Ready) ✅
-- **Completed Tasks**: 25/25 from TASKS.md (100%) - See `TASKS.md` for detailed status
-- **Critical Issues**: All 3 blocking issues RESOLVED ✅ - See `CRITICAL-FIXES.md` for resolution details
+- **Development Method**: BMad Method for Brownfield Development
+- **Current Phase**: QA & Testing (Epic 1: Critical Path Security Validation)
 - **Security**: 100/100 - All security features verified (mTLS, token rotation, rate limiting, fingerprinting)
 - **Reliability**: 100/100 - Circuit breakers integrated, panic recovery active, idempotency enforced
 - **Performance**: 100/100 - Query limits, optimized indexes, connection pooling
 - **Observability**: 100/100 - Structured logging, Prometheus metrics, distributed tracing
-- **Overall Score**: 100/100 - **READY FOR PRODUCTION DEPLOYMENT** 🎉
 
-### All Critical Fixes Completed ✅
+### How to Determine Next Steps
 
-**RESOLVED** (see `CRITICAL-FIXES.md` for implementation details):
+To understand what to do next, **ALWAYS CHECK THESE IN ORDER**:
 
-1. ✅ **Circuit Breaker Integration** - Verified `client_with_resilience.go` exists and all 6 gRPC clients use it
-2. ✅ **ERC1155 Batch Mint ABI Unpacking** - Verified proper `abi.UnpackIntoMap()` usage for dynamic arrays
-3. ✅ **Panic Recovery Interceptors** - Added to all 6 gRPC services with stack trace logging
+1. **Current Context** → Check `docs/` structure:
 
-### Next Steps
+   ```bash
+   [ ] docs/architecture.md exists?     → System documented
+   [ ] docs/prd.md exists?              → Requirements defined
+   [ ] docs/stories/*.md exists?        → Stories created
+   [ ] docs/qa/assessments/*.md exists? → QA phase determined
+   ```
 
-**Before deployment**: Complete `PRODUCTION-CHECKLIST.md` (estimated 4-6 hours)
-**Timeline**: Staging deployment → UAT → Production (1-2 days)
+2. **Workflow Guide** → Read `.bmad-core/working-in-the-brownfield.md`:
+
+   - Full brownfield workflow
+   - Test Architect commands
+   - Decision trees for QA stages
+
+3. **Current Story** → Check active story in `docs/stories/`:
+   - Read acceptance criteria
+   - Check associated QA assessments
+   - Determine TDD phase (RED/GREEN/REFACTOR)
+
+**Quick Decision Formula:**
+
+```
+Context (docs/) + Workflow (working-in-brownfield.md) + Story Details = NEXT STEP
+```
+
+### BMad Method Workflow
+
+**For ANY change (feature/bug/refactor), ALWAYS:**
+
+```bash
+# Phase 1: Before Development (MANDATORY for brownfield)
+1. @qa *risk {story}      → Assess risks & integration points
+2. @qa *design {story}    → Plan test strategy
+
+# Phase 2: Development (TDD)
+3. Write failing tests    → RED phase
+4. Implement code         → GREEN phase
+5. Refactor while green   → REFACTOR phase
+
+# Phase 3: Review & Gate
+6. @qa *trace {story}     → Verify coverage
+7. @qa *nfr {story}       → Validate performance
+8. @qa *review {story}    → Comprehensive review
+9. @qa *gate {story}      → Quality gate decision
+```
+
+**Brownfield Rules:**
+
+- ✅ MUST run \*risk before coding if touching legacy code
+- ✅ MUST run \*design before writing tests
+- ✅ MUST follow RED-GREEN-REFACTOR for all code
+- ❌ NEVER skip QA workflow for brownfield changes
+- ❌ NEVER write implementation before tests
+
+### Files to Tag When Asking "What's Next?"
+
+**Minimum (always tag):**
+
+```
+@.bmad-core/working-in-the-brownfield.md
+@docs/
+```
+
+**Recommended (add context):**
+
+```
+@docs/stories/[current-story].md
+@docs/qa/assessments/
+```
+
+**Optimal (during development):**
+
+```
+@CLAUDE.md                    # This file (TDD rules)
+@test/                        # Test files
+@services/[affected-service]/ # Code being changed
+```
 
 ### When Working on This Codebase
 
 1. **Check Production Features First**: Many advanced features are already implemented (see Production Features section)
-2. **Use Existing Shared Packages**: Check `shared/` directory before creating new utilities
-3. **Follow Established Patterns**:
+2. **Follow BMad Method**: Use `.bmad-core/working-in-the-brownfield.md` as primary guide
+3. **Use Existing Shared Packages**: Check `shared/` directory before creating new utilities
+4. **Follow Established Patterns**:
    - Token rotation for auth refresh
    - Circuit breakers for external calls
    - Structured logging with zerolog
    - Context-based timeouts
-4. **Security Considerations**:
+5. **TDD is Mandatory**: RED-GREEN-REFACTOR cycle for all code changes
+6. **QA Workflow Required**: Run Test Architect commands for brownfield changes
+7. **Security Considerations**:
    - mTLS is enabled for production - use docker-compose.tls.yml
    - All endpoints have rate limiting
    - Device fingerprinting is active
-5. **Database Changes**:
+8. **Database Changes**:
    - Use migration system in `shared/migration/`
    - Add indexes for new queries
    - Consider connection pool impact
