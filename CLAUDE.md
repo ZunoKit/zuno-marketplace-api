@@ -18,7 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Prerequisites
 
-- Go 1.24.5+
+- Go 1.25.1+
 - PostgreSQL 14+ (relational data)
 - MongoDB 6.0+ (events, metadata)
 - Redis 7.0+ (caching)
