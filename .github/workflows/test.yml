@@ -55,18 +55,18 @@ jobs:
       - name: Install dependencies
         run: |
           go mod download
-          go install gotest.tools/gotestsum@latest
 
       - name: Run unit tests
         run: |
-          gotestsum --junitfile unit-tests.xml -- -v -race -coverprofile=coverage.out ./services/*/test/unit/...
-
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: unit-test-results
-          path: unit-tests.xml
+          go test -v -race -coverprofile=coverage.out -covermode=atomic \
+            ./services/auth-service/test/unit/... \
+            ./services/user-service/test/unit/... \
+            ./services/wallet-service/test/unit/... \
+            ./services/catalog-service/test/unit/... \
+            ./services/chain-registry-service/test/unit/... \
+            ./services/orchestrator-service/test/unit/... \
+            ./services/indexer-service/test/unit/... \
+            ./services/media-service/test/unit/...
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
@@ -124,7 +124,12 @@ jobs:
 
       - name: Run integration tests
         run: |
-          go test -v -race -coverprofile=coverage.out ./services/*/test/integration/...
+          go test -v -race -coverprofile=coverage.out -covermode=atomic \
+            ./services/auth-service/test/integration/... \
+            ./services/user-service/test/integration/... \
+            ./services/wallet-service/test/integration/... \
+            ./services/orchestrator-service/test/integration/... \
+            ./services/indexer-service/test/integration/...
         env:
           POSTGRES_HOST: localhost
           POSTGRES_PORT: 5432
