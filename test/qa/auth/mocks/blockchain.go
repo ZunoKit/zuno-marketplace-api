@@ -276,10 +276,17 @@ func (m *NetworkHealthMonitor) checkHealth() {
 	}
 }
 
-// GetHealth returns current network health
+// GetHealth returns current network health (returns a copy to prevent data races)
 func (m *NetworkHealthMonitor) GetHealth() *NetworkHealth {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.health
+	
+	// Return a deep copy to prevent data races
+	healthCopy := &NetworkHealth{
+		Endpoints: make([]EndpointHealth, len(m.health.Endpoints)),
+	}
+	copy(healthCopy.Endpoints, m.health.Endpoints)
+	
+	return healthCopy
 }
 
