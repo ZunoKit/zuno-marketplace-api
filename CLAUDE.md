@@ -20,7 +20,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Prerequisites
 
-- Go 1.24.5+
+- Go 1.25.1+
 - PostgreSQL 14+ (relational data)
 - MongoDB 6.0+ (events, metadata)
 - Redis 7.0+ (caching)
@@ -99,8 +99,8 @@ cd infra/development/build
 ./user-build.bat
 # ... etc for other services
 
-# Run linter
-golangci-lint run ./...
+# Run Go vet
+go vet ./...
 ```
 
 **Testing**
@@ -403,7 +403,7 @@ Each service manages its own schema in `services/{service-name}/db/up.sql`. Thes
 ### Code Style & Linting
 
 - Follow Go conventions and idioms
-- Run `golangci-lint` before committing
+- Run `go vet` and `go fmt` before committing
 - Max line length: 120 characters
 - Max function complexity: 15 (gocyclo)
 - Max function length: 100 lines / 50 statements

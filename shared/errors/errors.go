@@ -254,7 +254,7 @@ func FromGRPCError(err error) *Error {
 		errorType = ErrorTypeInternal
 	}
 
-	return New(errorType, string(st.Code()), st.Message()).WithCause(err)
+	return New(errorType, st.Code().String(), st.Message()).WithCause(err)
 }
 
 // ErrorHandler provides context-aware error handling
