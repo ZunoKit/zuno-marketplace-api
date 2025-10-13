@@ -2,17 +2,11 @@ run:
   timeout: 5m
   issues-exit-code: 1
   tests: true
-  skip-dirs:
-    - vendor
-    - proto
-    - tools
-  skip-files:
-    - ".*\\.pb\\.go$"
-    - ".*_gen\\.go$"
-    - ".*generated.*\\.go$"
+  go: '1.25.1'
 
 output:
-  format: colored-line-number
+  formats:
+    - format: colored-line-number
   print-issued-lines: true
   print-linter-name: true
 
@@ -21,11 +15,9 @@ linters-settings:
     check-type-assertions: true
     check-blank: true
   govet:
-    check-shadowing: true
     enable:
       - shadow
-  golint:
-    min-confidence: 0.8
+      - fieldalignment
   gofmt:
     simplify: true
   goimports:
@@ -51,6 +43,8 @@ linters-settings:
   funlen:
     lines: 100
     statements: 50
+  revive:
+    confidence: 0.8
 
 linters:
   enable:
@@ -71,16 +65,27 @@ linters:
     - unconvert
     - dupl
     - prealloc
-    - exportloopref
     - noctx
     - funlen
     - whitespace
+    - revive # Replace deprecated golint
   disable:
-    - varcheck
-    - deadcode
-    - structcheck
+    - varcheck # Deprecated (merged into unused)
+    - deadcode # Deprecated (merged into unused)
+    - structcheck # Deprecated (merged into unused)
+    - golint # Deprecated (replaced by revive)
+    - exportloopref # Deprecated in Go 1.22+
 
 issues:
+  # Use new exclude options instead of deprecated skip-dirs/skip-files
+  exclude-dirs:
+    - vendor
+    - proto
+    - tools
+  exclude-files:
+    - ".*\\.pb\\.go$"
+    - ".*_gen\\.go$"
+    - ".*generated.*\\.go$"
   exclude-rules:
     - path: _test\.go
       linters:
@@ -93,13 +98,13 @@ issues:
       linters:
         - gocyclo
         - funlen
-    - text: "Use of weak random number generator"
+    - text: 'Use of weak random number generator'
       linters:
         - gosec
-    - text: "Subprocess launched with variable"
+    - text: 'Subprocess launched with variable'
       linters:
         - gosec
-    - text: "G404:"
+    - text: 'G404:'
       linters:
         - gosec
   exclude-use-default: false
